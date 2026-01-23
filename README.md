@@ -11,7 +11,30 @@
 ### 2. Cài đặt thư viện cần thiết
 ```bash
 pip install openpyxl  # Để chuyển đổi Excel sang JSON
+pip install python-dotenv  # Để quản lý AWS credentials
 ```
+
+### 2.1 Cấu hình AWS Polly (cho tính năng Voice Quiz)
+
+#### Bước 1: Tạo file `.env`
+Copy file `.env.example` thành `.env` và điền AWS credentials:
+
+```bash
+cp .env.example .env
+```
+
+#### Bước 2: Điền thông tin AWS
+Mở file `.env` và thêm:
+```
+AWS_ACCESS_KEY_ID=your_aws_access_key_here
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key_here
+AWS_REGION=ap-southeast-2
+```
+
+**Lưu ý**: 
+- ⚠️ File `.env` chứa thông tin nhạy cảm - **KHÔNG** commit lên GitHub
+- File `.env` đã được thêm vào `.gitignore`
+- Chỉ cần cấu hình nếu sử dụng Voice Quiz (`voice_quiz_v3.py`)
 
 ### 3. Cấu trúc thư mục
 ```
