@@ -13,7 +13,7 @@ import openpyxl
 import random
 import time
 from quiz_engine import QuizEngine
-from voice_quiz_v3 import VoiceQuizManagerV3
+from voice_quiz_v2 import VoiceQuizManager
 from db_manager import StudyHistoryDB
 from pathlib import Path
 import json
@@ -41,7 +41,7 @@ class LanguageQuizGUI:
         
         # Biến
         self.quiz_engine = None
-        self.voice_manager = VoiceQuizManagerV3()
+        self.voice_manager = VoiceQuizManager()
         self.study_db = StudyHistoryDB()  # 🎓 Spaced repetition database
         self.selected_file = None
         self.data = []
