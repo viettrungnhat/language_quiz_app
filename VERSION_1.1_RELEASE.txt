@@ -1,0 +1,337 @@
+════════════════════════════════════════════════════════════════════════════════
+✅ PHIÊN BẢN NÂNG CẬP 1.1 - BÀN GIAO HOÀN CHỈNH
+════════════════════════════════════════════════════════════════════════════════
+
+📌 TÌNH TRẠNG: ✅ HOÀN THÀNH 100%
+
+Ngày bàn giao: Tháng 1 2026
+Phiên bản: 1.1 (GUI + Excel trực tiếp)
+Vị trí: d:\Da Ngon Ngu\language_quiz_app\
+
+
+════════════════════════════════════════════════════════════════════════════════
+🎯 CỦA BỔSUNG (SO VỚI V1.0)
+════════════════════════════════════════════════════════════════════════════════
+
+✨ GIAO DIỆN ĐỒ HỌA (GUI - tkinter)
+   • 3 tab: Chuẩn bị | Kiểm tra | Kết quả
+   • Nút bấm, hộp thoại file, thanh tiến độ
+   • Không cần command line
+   • Feedback tức thời
+   • File: gui_main.py (500+ dòng)
+
+✨ IMPORT EXCEL TRỰC TIẾP
+   • Xử lý file .xlsx trực tiếp
+   • Không cần chuyển qua JSON
+   • Hỗ trợ nhiều sheet
+   • Chọn file bằng hộp thoại
+   • 100% đọc từ file Excel
+
+✨ TEMPLATE EXCEL MẪU
+   • 3 file template chuẩn
+   • TEMPLATE_ENGLISH.xlsx
+   • TEMPLATE_CHINESE.xlsx
+   • TEMPLATE_JAPANESE.xlsx
+   • Format chuẩn: Word | Meaning | Example EN | Example VI
+   • File: create_templates.py (tạo template)
+
+✨ SCRIPT CHẠY MỚI
+   • run_gui.bat - Chạy GUI trực tiếp (Windows)
+   • run.bat - Hỏi chọn GUI hay Terminal
+   • run.sh - Chạy GUI/Terminal (Linux/Mac)
+
+
+════════════════════════════════════════════════════════════════════════════════
+📂 CẤU TRÚC PROJECT HOÀN CHỈNH (30+ file)
+════════════════════════════════════════════════════════════════════════════════
+
+🖥️ GUI & EXCEL:
+   gui_main.py ........................ Chương trình GUI chính (500+ dòng)
+   create_templates.py ............... Tạo file template Excel
+   run_gui.bat ........................ Script chạy GUI (Windows)
+
+💻 CODE CHÍNH (v1.0 - giữ nguyên):
+   main.py ............................ Terminal version
+   quiz_engine.py ..................... Xử lý kiểm tra (200+ dòng)
+   scorer.py .......................... Chấm điểm (150+ dòng)
+   data_loader.py ..................... Load dữ liệu
+   excel_to_json.py ................... Chuyển Excel → JSON (tuỳ chọn)
+   advanced_features.py .............. Tính năng nâng cao (250+ dòng)
+
+🔴 HƯỚNG DẪN - GUI (MỚI):
+   GUI_GUIDE.txt ...................... Chi tiết sử dụng GUI
+   GUI_QUICK_START.txt ............... Hướng dẫn nhanh GUI
+   UPGRADE_NOTES.txt ................. Cập nhật từ v1.0 → v1.1
+
+🟠 HƯỚNG DẪN - CHUNG:
+   00_READ_ME_FIRST.txt .............. Cho người mới
+   START_HERE.txt ..................... Tổng quan đẹp
+   QUICK_START.txt ................... Hướng dẫn nhanh (Terminal)
+   SUMMARY.txt ........................ Tóm tắt toàn bộ
+
+🟡 HƯỚNG DẪN - CHI TIẾT:
+   README.md ........................... Hướng dẫn đầy đủ
+   FAQ.txt ............................. 45 Q&A
+   EXCEL_GUIDE.txt .................... Thêm dữ liệu
+   ARCHITECTURE.txt ................... Kiến trúc code
+
+⚙️ CẤU HÌNH & SETUP:
+   config.json ........................ Tùy chỉnh cấu hình
+   requirements.txt ................... Thư viện cần cài
+   run.bat ............................ Menu chọn GUI/Terminal
+   run.sh ............................. Script chạy (Linux/Mac)
+
+📁 DỮ LIỆU:
+   data/TEMPLATE_ENGLISH.xlsx ........ Template tiếng Anh
+   data/TEMPLATE_CHINESE.xlsx ........ Template tiếng Trung
+   data/TEMPLATE_JAPANESE.xlsx ....... Template tiếng Nhật
+
+📋 MANIFEST & CHECKLISTS:
+   INDEX.txt .......................... Danh sách file
+   MANIFEST.txt ....................... Thông tin project
+   DELIVERY_CHECKLIST.txt ............. Kiểm tra trước dùng
+   ARCHITECTURE.txt ................... Kiến trúc ứng dụng
+
+
+════════════════════════════════════════════════════════════════════════════════
+🚀 CÁCH CHẠY (CÓ 3 LỰA CHỌN)
+════════════════════════════════════════════════════════════════════════════════
+
+🖥️ GUI VERSION (KHUYẾN NGHỊ)
+───────────────────────────────
+
+Windows - Cách 1 (Đơn giản):
+  1. Nhấp đúp: run_gui.bat
+  2. Giao diện GUI mở lên
+
+Windows/Mac/Linux - Cách 2:
+  python gui_main.py
+
+VS Code:
+  • Mở gui_main.py → F5
+
+
+💻 TERMINAL VERSION (CŨ)
+───────────────────────
+
+Windows - Cách 1:
+  • Nhấp đúp: run.bat → Chọn 2
+  • Hoặc: python main.py
+
+Windows/Mac/Linux - Cách 2:
+  python main.py
+
+
+════════════════════════════════════════════════════════════════════════════════
+📋 HƯỚNG DẪN BẮTĐẦU - GUI
+════════════════════════════════════════════════════════════════════════════════
+
+BƯỚC 1: Chuẩn bị
+  1. python create_templates.py  (Tạo file template)
+     → Tạo 3 file: TEMPLATE_*.xlsx trong data/
+  
+  2. (Tuỳ chọn) Sửa template
+     → Mở file TEMPLATE_ENGLISH.xlsx
+     → Sửa/thêm dữ liệu
+     → Lưu file
+
+BƯỚC 2: Chạy GUI
+  python gui_main.py
+  → Cửa sổ GUI mở lên
+
+BƯỚC 3: Chuẩn bị kiểm tra (Tab 1)
+  1. Nhấp: "📁 Chọn File Excel..."
+     → Chọn TEMPLATE_ENGLISH.xlsx (hoặc file bạn)
+  
+  2. Chọn sheet (nếu có)
+  
+  3. Chọn loại kiểm tra:
+     ○ Meaning - Ý nghĩa
+     ○ Example - Dịch ví dụ
+     ○ Vietnamese - Dịch từ Việt
+  
+  4. Chọn số câu: 5, 10, 15, 20, Tất cả
+  
+  5. Nhấp: "▶️ BẮT ĐẦU KIỂM TRA"
+
+BƯỚC 4: Kiểm tra (Tab 2)
+  1. Xem tiến độ: ████░░░░░ 3/10
+  2. Đọc câu hỏi
+  3. Nhập trả lời + Enter
+  4. Xem feedback
+  5. Sửa lại nếu sai (tối đa 3 lần)
+  6. Tự động chuyển sang câu tiếp
+
+BƯỚC 5: Xem kết quả (Tab 3)
+  1. Tổng điểm: 42/50
+  2. Điểm trung bình: 84/100
+  3. Xếp loại: B - Tốt
+  4. Chi tiết từng câu
+  5. Nhấp "💾 Lưu Kết Quả" để lưu JSON
+
+
+════════════════════════════════════════════════════════════════════════════════
+📝 FORMAT FILE EXCEL CHUẨN
+════════════════════════════════════════════════════════════════════════════════
+
+HÀNG 1 - HEADER (Bắt buộc):
+┌──────────┬────────────┬────────────┬────────────┐
+│ Word     │ Meaning    │ Example EN │ Example VI │
+└──────────┴────────────┴────────────┴────────────┘
+
+HÀNG 2+ - DỮ LIỆU:
+┌──────────┬────────────┬────────────┬────────────────────┐
+│ aunt     │ cô, dì     │ Is she...? │ Cô ấy là cô không? │
+│ love     │ yêu, thích │ Do you...? │ Bạn yêu không?     │
+│ white    │ màu trắng  │ Is it...?  │ Nó trắng không?    │
+│ (tiếp...)│            │            │                    │
+└──────────┴────────────┴────────────┴────────────────────┘
+
+NGUYÊN TẮC:
+  ✓ Hàng 1: Header (Word, Meaning, Example EN, Example VI)
+  ✓ Hàng 2+: Dữ liệu
+  ✓ Không để ô trống (cột A)
+  ✓ Dữ liệu dây đặc (không dòng trống)
+  ✓ Lưu .xlsx (Excel 2016+)
+  
+  ✗ Không dùng .xls
+  ✗ Không để ô trống quan trọng
+
+
+════════════════════════════════════════════════════════════════════════════════
+🎯 MỤC TIÊU & PHƯƠNG ÁN HỌC TẬP
+════════════════════════════════════════════════════════════════════════════════
+
+TUẦN 1:
+  • Mỗi ngày: 5-10 câu, 1 ngôn ngữ
+  • Mục tiêu: 70+ điểm
+  • Kết quả: Quen với GUI
+
+TUẦN 2-4:
+  • Mỗi ngày: 10-15 câu
+  • 3 loại kiểm tra xen kẽ
+  • Mục tiêu: 80+ điểm
+  • Kết quả: Học 100+ từ
+
+THÁNG 2-3:
+  • Mỗi ngày: 15-20 câu
+  • Tất cả 3 ngôn ngữ
+  • Mục tiêu: 90+ điểm (A)
+  • Kết quả: Học 500+ từ
+
+
+════════════════════════════════════════════════════════════════════════════════
+✅ DANH SÁCH KIỂM TRA TRƯỚC CHẠY
+════════════════════════════════════════════════════════════════════════════════
+
+□ Python 3.8+ cài chưa?
+  python --version
+
+□ tkinter cài chưa?
+  • Windows: Nếu lỗi, cài lại Python (chọn tcl/tk)
+  • Linux: sudo apt-get install python3-tk
+  • Mac: Cài Python từ python.org
+
+□ openpyxl cài chưa?
+  pip install openpyxl
+
+□ File gui_main.py tồn tại?
+□ File create_templates.py tồn tại?
+□ Thư mục data/ tồn tại?
+
+
+════════════════════════════════════════════════════════════════════════════════
+🆘 LỖI THƯỜNG GẶP & GIẢI PHÁP
+════════════════════════════════════════════════════════════════════════════════
+
+❌ "ModuleNotFoundError: tkinter"
+✅ • Windows: Cài lại Python (chọn tcl/tk)
+✅ • Linux: sudo apt-get install python3-tk
+✅ • Mac: Cài Python từ python.org
+
+❌ GUI không mở lên
+✅ • Chạy từ terminal: python gui_main.py
+✅ • Xem error trong console
+✅ • Kiểm tra antivirus
+
+❌ Không chọn được file Excel
+✅ • Kiểm tra file .xlsx (không .xls)
+✅ • Kiểm tra đường dẫn
+✅ • Thử file khác
+
+❌ Template không tạo được
+✅ • python create_templates.py
+✅ • Kiểm tra quyền thư mục data/
+
+Chi tiết: Xem FAQ.txt hoặc GUI_GUIDE.txt
+
+
+════════════════════════════════════════════════════════════════════════════════
+📊 THÔNG TIN TECHNICAL
+════════════════════════════════════════════════════════════════════════════════
+
+Ngôn ngữ: Python 3.8+
+Giao diện: tkinter (built-in)
+Thư viện chính: openpyxl
+
+Tổng code:
+  • Python: 1500+ dòng
+  • Tài liệu: 2500+ dòng
+  • File: 30+
+
+Code mới (v1.1):
+  • gui_main.py: 500+ dòng
+  • create_templates.py: 100+ dòng
+  • Tài liệu GUI: 600+ dòng
+
+Tương thích:
+  • Windows ✓
+  • Linux ✓
+  • Mac ✓
+
+RAM cần: 100MB tối thiểu
+Disk cần: 10MB tối thiểu
+
+
+════════════════════════════════════════════════════════════════════════════════
+💾 CÁCH LƯU & BACKUP
+════════════════════════════════════════════════════════════════════════════════
+
+Lưu kết quả kiểm tra:
+  • Trong GUI: Nhấp "💾 Lưu Kết Quả"
+  • Chọn nơi lưu
+  • File JSON được lưu với:
+    - Tổng điểm
+    - Điểm trung bình
+    - Xếp loại
+    - Chi tiết từng câu
+
+Backup dữ liệu:
+  • Sao chép toàn bộ thư mục language_quiz_app
+  • Hoặc backup thư mục data/
+
+
+════════════════════════════════════════════════════════════════════════════════
+🎊 PHIÊN BẢN V1.1 SẴN SỮ DÙNG!
+════════════════════════════════════════════════════════════════════════════════
+
+Chạy ngay:
+  1. python create_templates.py      (Tạo template)
+  2. python gui_main.py              (Chạy GUI)
+  3. Chọn file Excel
+  4. Kiểm tra!
+
+Hoặc nhấp:
+  • run_gui.bat (Windows)
+
+Chúc bạn học tập vui vẻ! 🎓
+
+════════════════════════════════════════════════════════════════════════════════
+
+📌 CẬP NHẬT TIẾP THEO:
+   • v1.2: Thêm phát âm (Text-to-Speech)
+   • v1.2: Lưu tiến độ học viên
+   • v1.3: Thống kê & biểu đồ
+   • v1.4: Mobile version
+
+════════════════════════════════════════════════════════════════════════════════

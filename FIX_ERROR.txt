@@ -1,0 +1,87 @@
+═══════════════════════════════════════════════════════════════
+           🔧 FIX LỖI: "tuple index out of range"
+═══════════════════════════════════════════════════════════════
+
+❌ NGUYÊN NHÂN:
+   File Excel không có đúng format (thiếu cột hoặc sắp xếp sai)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ CÁCH FIX:
+
+1️⃣ TẠO TEMPLATE CHUẨN:
+   python create_templates.py
+   
+   Tạo 3 file template:
+   • TEMPLATE_ENGLISH.xlsx
+   • TEMPLATE_CHINESE.xlsx
+   • TEMPLATE_JAPANESE.xlsx
+
+2️⃣ KIỂM TRA FORMAT FILE HIỆN TẠI:
+   python check_excel_format.py Book1.xlsx
+   
+   Sẽ hiển thị:
+   • Số cột trong file
+   • Số câu hỏi hợp lệ
+   • Dòng nào bị lỗi
+
+3️⃣ ĐẢM BẢO FILE CÓ ĐÚNG FORMAT:
+   
+   Hàng 1 (Header):
+   ┌─────────────┬───────────────┬─────────────┬─────────────┐
+   │ Word        │ Meaning       │ Example EN  │ Example VI  │
+   └─────────────┴───────────────┴─────────────┴─────────────┘
+   
+   Hàng 2-N (Dữ liệu):
+   ┌─────────────┬───────────────┬─────────────┬─────────────┐
+   │ love        │ yêu, thích    │ Do you      │ Bạn có yêu  │
+   │ aunt        │ cô, dì        │ Is she      │ Cô ấy là    │
+   │ beautiful   │ đẹp, xinh     │ So pretty   │ Rất xinh     │
+   └─────────────┴───────────────┴─────────────┴─────────────┘
+
+⚠️  ĐIỀU KIỆN BẮT BUỘC:
+   ✓ Cột 1 (Word) KHÔNG được trống
+   ✓ Cột 2 (Meaning) KHÔNG được trống
+   ✓ Phải có ít nhất 4 cột
+   ✓ Định dạng file .xlsx
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 GIẢI PHÁP NHANH:
+
+   Nếu file Book1.xlsx không đúng format:
+   
+   a) Chọn template thích hợp:
+      • TEMPLATE_ENGLISH.xlsx (cho tiếng Anh)
+      • TEMPLATE_CHINESE.xlsx (cho tiếng Trung)
+      • TEMPLATE_JAPANESE.xlsx (cho tiếng Nhật)
+   
+   b) Mở template → thêm dữ liệu của bạn
+   
+   c) Lưu file với tên mới (không overwrite template)
+   
+   d) Dùng file mới trong GUI
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📝 VÍ DỤ TẠOGITHUB FILE ĐÚNG FORMAT:
+
+   ✅ Đúng:
+      Hàng 1: Word    | Meaning    | Example EN | Example VI
+      Hàng 2: book    | sách       | I read...  | Tôi đọc...
+      Hàng 3: friend  | bạn bè     | My friend  | Bạn tôi...
+
+   ❌ Sai:
+      Hàng 1: Word | Meaning    (chỉ 2 cột)
+      Hàng 1: Word | Meaning | Example (chỉ 3 cột)
+      Hàng 2: [trống] | meaning   (Word trống)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 CHẠY LẠI:
+
+   1. python create_templates.py
+   2. python check_excel_format.py TEMPLATE_ENGLISH.xlsx
+   3. python gui_main.py
+
+═══════════════════════════════════════════════════════════════

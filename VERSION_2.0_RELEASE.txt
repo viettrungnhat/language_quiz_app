@@ -1,0 +1,317 @@
+═══════════════════════════════════════════════════════════════════════════════
+🎉 PHIÊN BẢN v2.0 HOÀN THÀNH - KIỂM TRA BẰNG GIỌNG NÓI
+═══════════════════════════════════════════════════════════════════════════════
+
+✨ ĐỀ XUẤT: Thêm tính năng kiểm tra bằng giọng nói
+✅ TRẠNG THÁI: HOÀN THÀNH 100%
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📦 CÁI ĐẶT PACKAGES (LẦN ĐẦU)
+
+Chạy lệnh này một lần:
+
+   pip install pyttsx3 SpeechRecognition pyaudio openpyxl
+
+LƯU Ý WINDOWS:
+   • Nếu pyaudio gặp lỗi, xem VOICE_QUIZ_GUIDE.txt phần "CÀI ĐẶT"
+   • Hoặc tải .whl file từ: https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🚀 CHẠY NGAY
+
+Windows (Đơn giản nhất):
+   1. Mở thư mục: d:\Da Ngon Ngu\language_quiz_app
+   2. Nhấp đúp: run_gui_v2.bat
+
+Hoặc terminal:
+   python gui_main_v2.py
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 CÔNG NĂNG MỚI (v2.0)
+
+✨ TAB 3: KIỂM TRA GIỌNG NÓI
+
+   [Chuẩn bị] → Chọn file → Loại kiểm tra → Số câu → "KIỂM TRA GIỌNG NÓI"
+        ↓
+   [Kiểm tra Giọng Nói] ← TỰA MỚI
+        ├─ Câu hỏi hiển thị + phát bằng giọng nói (TTS)
+        ├─ Bạn nói câu trả lời
+        ├─ Nhấn "NGHE GIỌNG NÓI"
+        ├─ Máy nhận dạng (STT)
+        ├─ Máy so sánh & chấm điểm
+        └─ Tự động chuyển câu tiếp theo
+        ↓
+   [Kết Quả] → Tổng điểm, xếp loại, lưu JSON
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📝 CÁC FILE MỚI THÊM
+
+voice_quiz.py ⭐ CHÍNH
+   └─ VoiceManager: Quản lý TTS (phát âm) & STT (nhận dạng)
+   └─ VoiceQuizManager: Logic kiểm tra giọng nói
+
+gui_main_v2.py ⭐ CHÍNH
+   └─ 4 Tab: Chuẩn bị | Kiểm tra thường | Kiểm tra giọng nói | Kết quả
+   └─ _create_voice_quiz_tab(): Tab mới cho voice quiz
+
+run_gui_v2.bat
+   └─ Windows launcher tự động cài packages + mở GUI v2.0
+
+test_voice_system.py
+   └─ Kiểm tra: TTS, STT, Microphone, Internet, Modules
+
+VOICE_QUIZ_GUIDE.txt
+   └─ Hướng dẫn chi tiết (10+ trang)
+
+VOICE_QUICK_START.txt
+   └─ Quick start 5 phút
+
+README_v2.md
+   └─ Tài liệu toàn diện v2.0
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🎤 CÔNG NGHỆ GIỌNG NÓI
+
+TEXT-TO-SPEECH (TTS):
+   Library: pyttsx3
+   Hỗ trợ: Offline (không cần internet)
+   Tính năng: Phát audio từ text
+   Hỗ trợ: English, Chinese, Japanese, Vietnamese
+
+SPEECH-TO-TEXT (STT):
+   Library: SpeechRecognition + Google
+   Hỗ trợ: Online (cần internet)
+   Tính năng: Chuyển âm thanh → text
+   Độ chính xác: ~95% (tùy tiếng nói)
+
+MICROPHONE:
+   Library: pyaudio
+   Hỗ trợ: Ghi âm từ microphone
+   Yêu cầu: Microphone kết nối
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🔄 QUY TRÌNH KIỂM TRA GIỌNG NÓI
+
+1. BẮT ĐẦU:
+   Chọn file Excel → Cấu hình → "KIỂM TRA GIỌNG NÓI"
+
+2. HIỂN THỊ CÂU HỎI:
+   ├─ Hiển thị text: ❓ What does 'book' mean?
+   ├─ Phát âm: "What does book mean?" (TTS)
+   └─ Chờ bạn nói
+
+3. LẮNG NGHE:
+   ├─ Nhấn "🎤 NGHE GIỌNG NÓI"
+   ├─ Chờ bạn nói (max 15 giây)
+   └─ Ghi âm + gửi Google
+
+4. NHẬN DẠNG:
+   ├─ Google nhận dạng → "a written work"
+   ├─ Hiển thị: 🎤 Bạn nói: a written work
+   └─ Chuyển về
+
+5. SO SÁNH:
+   ├─ Đáp án đúng: "a published set of pages"
+   ├─ So sánh độ tương đồng
+   └─ Điểm: 7/10 (70% tương đồng)
+
+6. FEEDBACK:
+   ├─ ⚠️ Khá! Độ chính xác 70%
+   ├─ Đáp án đúng: a published set of pages
+   ├─ Điểm: 7/10
+   └─ Tự động chuyển câu tiếp theo (sau 2 giây)
+
+7. LẶP LẠI:
+   Quay lại bước 2 cho câu hỏi tiếp theo
+
+8. KẾT THÚC:
+   Sau câu cuối cùng → Tự động hiển thị kết quả
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📊 CHẤM ĐIỂM
+
+Dựa trên độ tương đồng (Sequence Matching):
+
+   100% tương đồng    → 10/10 ✅ Chính xác
+   80-99%              → 8-10 ✅ Tốt
+   70-79%              → 5-7 ⚠️  Khá
+   50-69%              → 2-4 ❌ Yếu
+   <50%                → 0 ❌ Sai
+
+Điểm tổng = (Tổng từ tất cả câu) / (Số câu) 
+
+═══════════════════════════════════════════════════════════════════════════════
+
+⚙️ CẤU HÌNH
+
+Chỉnh các thông số trong voice_quiz.py:
+
+# TỐC ĐỘ NÓI:
+self.tts_engine.setProperty('rate', 150)
+   150 = tốc độ bình thường
+   100-130 = chậm hơn
+   170-200 = nhanh hơn
+
+# ÂM LƯỢNG:
+self.tts_engine.setProperty('volume', 0.9)
+   0.9 = 90% (bình thường)
+   0.5 = 50% (nhỏ)
+   1.0 = 100% (to)
+
+# NGƯỠNG ÂM THANH MICROPHONE:
+self.recognizer.energy_threshold = 4000
+   Cao hơn → bỏ qua tiếng nền nhiều
+   Thấp hơn → nhạy cảm hơn
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🆘 TROUBLESHOOTING
+
+❌ "ModuleNotFoundError: pyttsx3"
+   → pip install pyttsx3
+
+❌ "ModuleNotFoundError: speech_recognition"
+   → pip install SpeechRecognition
+
+❌ "ModuleNotFoundError: pyaudio"
+   → pip install pyaudio
+   → Nếu Windows: Tải .whl file (xem VOICE_QUIZ_GUIDE.txt)
+
+❌ "Lỗi microphone"
+   → Kiểm tra Windows Settings → Sound
+   → Microphone kết nối chưa?
+
+❌ "Không nhận dạng được giọng nói"
+   → Nói rõ ràng hơn
+   → Kiểm tra kết nối internet (Google STT cần internet)
+
+❌ "Máy không phát âm"
+   → Kiểm tra loa bật chưa?
+   → Kiểm tra âm lượng Windows
+
+❌ "Không có internet → STT không hoạt động"
+   → Điều đó bình thường (Google STT cần internet)
+   → Có thể dùng TTS (phát âm) mà không cần internet
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🧪 TEST HỆ THỐNG
+
+Chạy lệnh để kiểm tra toàn bộ:
+
+   python test_voice_system.py
+
+Kết quả sẽ kiểm tra:
+   ✓ Tất cả packages
+   ✓ Text-to-Speech
+   ✓ Microphone
+   ✓ Internet connection
+   ✓ Module imports
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📚 HƯỚNG DẪN CHI TIẾT
+
+Hướng dẫn dài:         VOICE_QUIZ_GUIDE.txt (20+ trang)
+Quick start 5 phút:    VOICE_QUICK_START.txt
+GUI tổng quát:        GUI_GUIDE.txt
+README v2.0:          README_v2.md
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ HOÀN THÀNH CÁC TÍNH NĂNG
+
+v2.0 (Voice Quiz):
+   ✅ Text-to-Speech (TTS) - phát câu hỏi
+   ✅ Speech-to-Text (STT) - nhận dạng trả lời
+   ✅ Microphone support - ghi âm
+   ✅ Tab Voice Quiz - giao diện
+   ✅ Tự động chấm điểm - 0-100
+   ✅ So sánh thông minh - sử dụng Sequence Matching
+   ✅ Feedback tức thì - hiển thị kết quả ngay
+   ✅ Tự động next - chuyển câu tiếp theo
+   ✅ Hướng dẫn chi tiết - 3 file guide
+   ✅ Test script - kiểm tra hệ thống
+
+v1.1 (GUI):
+   ✅ Giao diện 4 tab
+   ✅ Excel trực tiếp
+   ✅ Kiểm tra thường
+   ✅ Kết quả & lưu JSON
+   ✅ Launcher batch
+
+v1.0 (Terminal):
+   ✅ Menu lựa chọn
+   ✅ Kiểm tra 3 loại
+   ✅ Chấm điểm 0-100
+   ✅ Thống kê chi tiết
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🎓 KỊCH BẢN SỬ DỤNG
+
+Bạn: Học tiếng Anh, muốn luyện nói
+
+Quá trình:
+1. Mở GUI v2.0
+2. Chọn file Excel tiếng Anh
+3. Nhấn "KIỂM TRA GIỌNG NÓI"
+4. Máy hỏi + phát âm
+5. Bạn nói câu trả lời
+6. Máy chấm điểm tự động
+7. Xem kết quả & điểm tổng
+
+Kết quả: Luyện nói + feedback tức thì = Hiệu quả cao! 🚀
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🔐 GHI CHÚ BẢOẨN
+
+• Google Speech Recognition:
+  - Gửi audio lên Google servers
+  - Google có thể lưu lại
+  - Cần kết nối internet
+
+• Nếu muốn riêngẩ:
+  - Dùng Vosk (offline)
+  - Hoặc OpenAI Whisper
+  - Hoặc Azure Speech Services
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🚀 BẮT ĐẦU NGAY
+
+Windows:
+   1. pip install pyttsx3 SpeechRecognition pyaudio openpyxl
+   2. python run_gui_v2.bat
+   3. Chọn file → "KIỂM TRA GIỌNG NÓI"
+   4. Xem kết quả!
+
+Linux/Mac:
+   1. pip install pyttsx3 SpeechRecognition pyaudio openpyxl
+   2. python gui_main_v2.py
+   3. Thực hiện các bước giống Windows
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📞 LIÊN HỆ HỖ TRỢ
+
+Nếu gặp vấn đề:
+
+1. Chạy: python test_voice_system.py
+2. Xem kết quả kiểm tra
+3. Đọc VOICE_QUIZ_GUIDE.txt phần lỗi tương ứng
+4. Thử lại
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Cảm ơn bạn đã sử dụng Language Quiz v2.0! 🎓
+
+Niệm vui học ngôn ngữ! 🌍✨

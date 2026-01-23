@@ -1,0 +1,27 @@
+# Language Quiz v2.2 - Multi-Language Requirements
+# Voice: AWS Polly (English/Chinese/Japanese) + gTTS (Vietnamese)
+# Font: DejaVuSans + SamsungGothicKorean
+
+# GUI
+tkinter>=3.8
+
+# Excel
+openpyxl>=3.0.0
+
+# AWS Polly (Speech Synthesis - English/Chinese/Japanese)
+boto3>=1.26.0
+botocore>=1.29.0
+
+# gTTS (Speech Synthesis - Vietnamese)
+gtts>=2.3.0
+
+# STT (Speech Recognition - Google)
+SpeechRecognition>=3.10.0
+pyaudio>=0.2.11
+
+# Audio Playback
+pygame>=2.0.0
+
+# Data Processing
+difflib              # Standard library
+

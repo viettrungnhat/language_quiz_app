@@ -1,0 +1,217 @@
+╔═══════════════════════════════════════════════════════════════╗
+║                                                               ║
+║        🎓 CHATBOT KIỂM TRA NGÔN NGỮ - VERSION 1.0          ║
+║                                                               ║
+║     ✨ Tiếng Anh | Tiếng Trung | Tiếng Nhật ✨              ║
+║                                                               ║
+║         Chấm điểm tự động - Cho phép sửa lỗi                ║
+║          Gợi ý thông minh - Thống kê chi tiết               ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
+
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃                    🎯 TÍNH NĂNG CHÍNH                      ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃                                                             ┃
+┃  ✓ LỰA CHỌN NGÔN NGỮ                                       ┃
+┃    • 🇬🇧 Tiếng Anh (English)                               ┃
+┃    • 🇨🇳 Tiếng Trung (中文)                               ┃
+┃    • 🇯🇵 Tiếng Nhật (日本語)                               ┃
+┃                                                             ┃
+┃  ✓ LOẠI KIỂM TRA                                           ┃
+┃    • 📝 Meaning - Hỏi ý nghĩa                              ┃
+┃    • 📖 Example - Dịch ví dụ                               ┃
+┃    • 🌐 Vietnamese - Dịch từ Việt                          ┃
+┃                                                             ┃
+┃  ✓ LỰA CHỌN SỐ CÂU                                         ┃
+┃    • 5 câu | 10 câu | 15 câu | 20 câu | Tất cả            ┃
+┃                                                             ┃
+┃  ✓ CHẤM ĐIỂM TỰ ĐỘNG (0-100)                              ┃
+┃    • 💯 Lần 1 đúng: 10/10                                  ┃
+┃    • ✨ Lần 2 đúng: 7/10                                   ┃
+┃    • ⭐ Lần 3 đúng: 4/10                                   ┃
+┃    • 🎓 Xếp loại: A(90+) B(80+) C(70+) D(60+) F(<60)       ┃
+┃                                                             ┃
+┃  ✓ CHO PHÉP SỬA LỖI                                        ┃
+┃    • Tối đa 3 lần trả lời mỗi câu                         ┃
+┃    • Gợi ý thông minh (h = hint)                           ┃
+┃    • Xem đáp án (c = correct)                              ┃
+┃                                                             ┃
+┃  ✓ THỐNG KÊ CHI TIẾT                                       ┃
+┃    • Tổng điểm & điểm trung bình                           ┃
+┃    • Xếp loại cuối cùng                                    ┃
+┃    • Phân tích từng câu                                    ┃
+┃                                                             ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+
+┌─────────────────────────────────────────────────────────────┐
+│                  🚀 CÁCH CHẠY NHANH NHẤT                   │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Windows:    Nhấp đúp file run.bat                         │
+│              hoặc: python main.py                           │
+│                                                             │
+│  Linux/Mac:  python3 main.py                               │
+│              hoặc: chmod +x run.sh && ./run.sh             │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃              📁 DANH SÁCH FILE & CẤP ĐỘ ƯUTIÊN             ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃                                                             ┃
+┃  🔴 ĐỌC TRƯỚC TIÊN (Bắt buộc)                             ┃
+┃  ├─ 📌 INDEX.txt ........................ Danh sách file    ┃
+┃  └─ ⭐ SUMMARY.txt ....................... Tóm tắt toàn bộ ┃
+┃                                                             ┃
+┃  🟠 HƯỚNG DẪN CHÍNH (Rất quan trọng)                       ┃
+┃  ├─ ⭐ QUICK_START.txt ............. Hướng dẫn nhanh      ┃
+┃  ├─ 📚 README.md ..................... Hướng dẫn chi tiết  ┃
+┃  └─ ❓ FAQ.txt ........................ Câu hỏi thường gặp  ┃
+┃                                                             ┃
+┃  🟡 HƯỚNG DẪN CHUYÊN BIỆT (Nếu cần)                       ┃
+┃  ├─ 🔄 EXCEL_GUIDE.txt ............ Thêm dữ liệu từ Excel  ┃
+┃  ├─ 🏗️  ARCHITECTURE.txt ............. Kiến trúc ứng dụng  ┃
+┃  └─ ⚙️  config.json ..................... Tùy chỉnh cấu hình┃
+┃                                                             ┃
+┃  🟢 FILE CHƯƠNG TRÌNH (Không cần chỉnh sửa)                ┃
+┃  ├─ 🎯 main.py ..................... Chương trình chính    ┃
+┃  ├─ ⚙️  quiz_engine.py ................. Xử lý kiểm tra    ┃
+┃  ├─ 📊 scorer.py ...................... Chấm điểm          ┃
+┃  ├─ 📖 data_loader.py ................. Load dữ liệu       ┃
+┃  ├─ 🔄 excel_to_json.py ........... Chuyển Excel → JSON   ┃
+┃  ├─ ✨ advanced_features.py ........ Tính năng nâng cao   ┃
+┃  ├─ 🚀 run.bat ..................... Chạy (Windows)      ┃
+┃  ├─ 🚀 run.sh ....................... Chạy (Linux/Mac)   ┃
+┃  └─ 📦 requirements.txt ............... Thư viện cần cài   ┃
+┃                                                             ┃
+┃  📁 data/ ............................. Thư mục dữ liệu     ┃
+┃  ├─ sample_english.json (Mẫu tiếng Anh)                   ┃
+┃  ├─ sample_chinese.json (Mẫu tiếng Trung)                 ┃
+┃  └─ sample_japanese.json (Mẫu tiếng Nhật)                 ┃
+┃                                                             ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+
+┌─────────────────────────────────────────────────────────────┐
+│               💾 CÁCH THÊM DỮ LIỆU TỪFILE EXCEL            │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Bước 1: Chuẩn bị file Excel 4 cột                        │
+│  ┌────────────────────────────────────┐                  │
+│  │ A: word | B: meaning | C: ex_en | D: ex_vi │         │
+│  │ aunt    │ cô, dì   │ Is she... | Cô ấy... │         │
+│  │ love    │ yêu      │ Do you... | Bạn có.. │         │
+│  └────────────────────────────────────┘                  │
+│                                                             │
+│  Bước 2: Chạy python excel_to_json.py                    │
+│  Bước 3: Nhập tên file Excel                             │
+│  Bước 4: Nhập tên file JSON output                       │
+│  Bước 5: Chạy lại main.py - dữ liệu xuất hiện!          │
+│                                                             │
+│  📖 Chi tiết: Xem EXCEL_GUIDE.txt                        │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+
+
+╔═══════════════════════════════════════════════════════════════╗
+║                   🎮 QUY TRÌNH KIỂM TRA                      ║
+╠═══════════════════════════════════════════════════════════════╣
+║                                                               ║
+║  1️⃣  CHẠY: python main.py hoặc run.bat                       ║
+║                                                               ║
+║  2️⃣  CHỌN:  Ngôn ngữ → Loại kiểm tra → Số câu              ║
+║                                                               ║
+║  3️⃣  HỎI:   Câu hỏi hiển thị (tối đa 3 lần trả lời)         ║
+║      📝 Trả lời bình thường                                  ║
+║      h = Xem gợi ý                                           ║
+║      c = Xem đáp án                                          ║
+║                                                               ║
+║  4️⃣  ĐO:    Hệ thống chấm điểm tự động (0-100)              ║
+║                                                               ║
+║  5️⃣  TỔNG:  In kết quả chi tiết + Xếp loại (A-F)           ║
+║                                                               ║
+║  6️⃣  LẶP:   Chọn tiếp tục hoặc thoát                        ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────┐
+│              ❓ THƯỜNG GẶP & GIẢI PHÁP NHANH               │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ ❌ Lỗi "ModuleNotFoundError"                               │
+│ ✅ Giải pháp: pip install openpyxl                        │
+│                                                             │
+│ ❌ Lỗi "Python not found"                                  │
+│ ✅ Giải pháp: Cài Python 3.8+ từ python.org               │
+│                                                             │
+│ ❌ Không thêm được dữ liệu từ Excel                        │
+│ ✅ Giải pháp: Xem EXCEL_GUIDE.txt (chi tiết)              │
+│                                                             │
+│ ❌ Điểm sao thấp hơn expected?                             │
+│ ✅ Giải pháp: Xem FAQ.txt (Q16-Q20)                       │
+│                                                             │
+│ ❓ Còn câu hỏi khác?                                       │
+│ ✅ Xem: FAQ.txt (45 Q&A đầy đủ)                           │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+
+
+╔═══════════════════════════════════════════════════════════════╗
+║                   📊 THANG ĐIỂM & XẾPLAẠI                   ║
+╠═══════════════════════════════════════════════════════════════╣
+║                                                               ║
+║  ĐIỂM MỖI CÂU (0-10):                                       ║
+║  ┌─────────────────────────────────────────────┐           ║
+║  │ 10/10  Lần 1 trả lời đúng chính xác         │           ║
+║  │  8/10  Lần 1 trả lời gần đúng               │           ║
+║  │  7/10  Lần 2 trả lời đúng                   │           ║
+║  │  5/10  Lần 2 trả lời gần đúng               │           ║
+║  │  4/10  Lần 3 trả lời đúng                   │           ║
+║  │  0/10  Sai hoàn toàn                        │           ║
+║  └─────────────────────────────────────────────┘           ║
+║                                                               ║
+║  XẾP LOẠI (0-100):                                          ║
+║  ┌─────────────────────────────────────────────┐           ║
+║  │ A  Xuất sắc              (90-100%)          │           ║
+║  │ B  Tốt                   (80-89%)           │           ║
+║  │ C  Khá                   (70-79%)           │           ║
+║  │ D  Đạt                   (60-69%)           │           ║
+║  │ F  Chưa đạt              (<60%)             │           ║
+║  └─────────────────────────────────────────────┘           ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
+
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃                   🌟 TÍNH NĂNG NÀY THÊMEEK ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃                                                             ┃
+┃  Đã chuẩn bị sẵn trong advanced_features.py:               ┃
+┃                                                             ┃
+┃  ○ Lưu tiến độ học (UserProgress)                         ┃
+┃  ○ Phát âm từ (TextToSpeech - cần pyttsx3)                ┃
+┃  ○ Ôn tập từ yếu (WeakWordMode)                           ┃
+┃  ○ Xuất kết quả (ExportResults - CSV/JSON)                ┃
+┃  ○ Thống kê nâng cao (QuizStatistics)                     ┃
+┃                                                             ┃
+┃  👉 Chỉ cần "uncomment" code để sử dụng!                   ┃
+┃                                                             ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+
+╔═══════════════════════════════════════════════════════════════╗
+║                                                               ║
+║                  🎓 CHÚC BẠN HỌC TẬP VUI VẼ! 🎓             ║
+║                                                               ║
+║          Tạo bởi: AI Assistant (Tháng 1 2026)               ║
+║                                                               ║
+║         Phiên bản: 1.0 (Full) | Tổng: 1000+ dòng code      ║
+║                                                               ║
+║    Hỗ trợ: 3 ngôn ngữ | 3 loại kiểm tra | Chấm điểm auto  ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝

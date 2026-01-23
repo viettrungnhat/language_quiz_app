@@ -1,0 +1,275 @@
+═══════════════════════════════════════════════════════════════
+🖥️ HƯỚNG DẪN PHIÊN BẢN GUI (GIAO DIỆN ĐỒ HỌA)
+═══════════════════════════════════════════════════════════════
+
+✨ Tính năng mới:
+─────────────────
+
+✅ GIAO DIỆN ĐỒ HỌA (GUI)
+   • Dễ sử dụng, không cần dùng command line
+   • 3 tab: Chuẩn bị | Kiểm tra | Kết quả
+   • Nút bấm, hộp thoại, thanh tiến độ
+
+✅ IMPORT EXCEL TRỰC TIẾP
+   • Chọn file Excel bằng nút "Chọn File Excel..."
+   • Không cần chuyển đổi sang JSON
+   • Xử lý trực tiếp từ Excel
+
+✅ NHIỀU SHEET
+   • Nếu file Excel có nhiều sheet
+   • GUI cho phép chọn sheet nào kiểm tra
+
+✅ TEMPLATE EXCEL MẪU
+   • File template chuẩn: TEMPLATE_*.xlsx
+   • Sẵn có cho 3 ngôn ngữ
+   • Chỉ cần sao chép và thay đổi dữ liệu
+
+
+🚀 CÁCH CHẠY GUI
+────────────────
+
+CÁCH 1: Windows (nhấp run.bat)
+  1. Nhấp đúp file: run.bat
+  2. Chọn: 1 (GUI Version)
+  3. Cửa sổ GUI mở lên
+
+CÁCH 2: Terminal/Command Prompt
+  cd d:\Da Ngon Ngu\language_quiz_app
+  python gui_main.py
+
+CÁCH 3: VS Code
+  Mở gui_main.py
+  Nhấn F5
+
+
+📋 TAB 1: CHUẨN BỊ
+──────────────────
+
+1️⃣  CHỌN FILE EXCEL
+    • Nhấp nút "📁 Chọn File Excel..."
+    • Chọn file Excel của bạn
+    • Hoặc dùng template có sẵn
+
+2️⃣  CHỌN SHEET
+    • Nếu Excel có nhiều sheet
+    • GUI hiển thị danh sách sheet
+    • Chọn sheet muốn kiểm tra
+
+3️⃣  CẤU HÌNH
+    • Loại kiểm tra:
+      ○ Meaning (ý nghĩa)
+      ○ Example (dịch ví dụ)
+      ○ Vietnamese (dịch từ Việt)
+    
+    • Số câu:
+      ○ 5, 10, 15, 20
+      ○ Tất cả
+
+4️⃣  BẮT ĐẦU
+    • Nhấp: "▶️ BẮT ĐẦU KIỂM TRA"
+    • Chuyển sang tab kiểm tra
+
+
+🎯 TAB 2: KIỂM TRA
+──────────────────
+
+Hiển thị:
+  • Tiến độ: [====>  ] 3/10
+  • Câu hỏi: In toàn bộ câu hỏi
+  • Hộp trả lời: Nhập câu trả lời
+  • 3 nút hành động:
+    - "💬 Gợi Ý" = xem hint
+    - "👁️ Xem Đáp Án" = show answer
+    - "✅ Gửi" = submit answer
+  • Feedback: Hiển thị kết quả từng câu
+
+Phím tắt:
+  • Enter = Gửi câu trả lời
+  • (Sau) = Tự động chuyển sang câu tiếp theo
+
+
+📊 TAB 3: KẾT QUẢ
+─────────────────
+
+Hiển thị:
+  • 📊 KẾT QUẢ KIỂM TRA
+  • Tổng điểm: 42/50
+  • Điểm trung bình: 84/100
+  • Xếp loại: B - Tốt
+  • Chi tiết từng câu:
+    - Câu hỏi
+    - Trả lời
+    - Đáp án
+    - Điểm số
+
+Nút hành động:
+  • "💾 Lưu Kết Quả" = Lưu JSON
+  • "🔄 Kiểm Tra Lại" = Quay lại tab 1
+
+
+🎯 CÁCH SỬ DỤNG TEMPLATE
+────────────────────────
+
+Bước 1: Tạo template
+  python create_templates.py
+  → Tạo 3 file template trong data/
+
+Bước 2: Sửa template
+  Mở file: data/TEMPLATE_ENGLISH.xlsx
+  Sửa dữ liệu mẫu
+  Thêm dữ liệu mới
+  Lưu file
+
+Bước 3: Dùng trong GUI
+  python gui_main.py
+  Chọn file: TEMPLATE_ENGLISH.xlsx
+  Kiểm tra!
+
+
+📝 FORMAT FILE EXCEL CHUẨN
+─────────────────────────
+
+Header (Dòng 1):
+┌─────────┬──────────┬────────────┬────────────┐
+│ Word    │ Meaning  │ Example EN │ Example VI │
+└─────────┴──────────┴────────────┴────────────┘
+
+Dữ liệu (Từ dòng 2):
+┌─────────┬──────────┬────────────┬────────────┐
+│ aunt    │ cô, dì   │ Is she...? │ Cô ấy...?  │
+│ love    │ yêu      │ Do you...? │ Bạn có...? │
+│ white   │ màu trắng│ Is it...?  │ Nó có...?  │
+└─────────┴──────────┴────────────┴────────────┘
+
+Lưu ý:
+  • Hàng 1: Header (Word, Meaning, Example EN, Example VI)
+  • Từ hàng 2: Dữ liệu
+  • Không bỏ dòng trống giữa
+  • Cột A (Word): Không được trống
+
+
+🔧 TÙỶ CHỈNH GUI
+─────────────────
+
+File: gui_main.py
+
+Nếu muốn thay đổi:
+  • Kích thước cửa sổ: root.geometry("900x700")
+  • Màu sắc: self.root.configure(bg="#f0f0f0")
+  • Các nút, label: Tìm ttk.Button, ttk.Label
+  • Logic: Tìm hàm tương ứng
+
+
+💡 TIPS
+───────
+
+1. Template giúp tối ưu hóa format
+   → Luôn dùng template làm cơ sở
+
+2. Đặt tên file Excel rõ ràng
+   → VD: english_h2.xlsx (thay vì "file 123")
+
+3. Nếu Excel có nhiều sheet
+   → Chỉ tính sheet được chọn
+   → Các sheet khác bị bỏ qua
+
+4. Phím Enter = Gửi câu trả lời
+   → Không cần nhấp nút "Gửi"
+
+5. Nút "Xem Đáp Án" = 0 điểm
+   → Chỉ xem nếu sai quá nhiều
+
+
+🆘 TROUBLESHOOTING
+────────────────
+
+Lỗi: "No module named tkinter"
+Giải: Cài tkinter
+  • Windows: Cài lại Python (chọn "tcl/tk")
+  • Linux: sudo apt-get install python3-tk
+  • Mac: Cài Python từ python.org
+
+Lỗi: Cửa sổ GUI không xuất hiện
+Giải: 
+  • Kiểm tra antivirus chặn không
+  • Thử chạy từ terminal: python gui_main.py
+  • Kiểm tra console output
+
+Lỗi: "Excel file seems to be binary"
+Giải:
+  • Lưu file Excel dưới .xlsx (Excel 2016+)
+  • Không dùng .xls (Excel 2003)
+
+Lỗi: Không thể chọn file
+Giải:
+  • Kiểm tra file tồn tại
+  • Kiểm tra đường dẫn (không có ký tự lạ)
+
+
+📊 SO SÁNH: GUI vs Terminal
+──────────────────────────
+
+GUI Version:
+  ✓ Dễ sử dụng
+  ✓ Giao diện đẹp
+  ✓ Import Excel dễ
+  ✓ Không cần command line
+  ✗ Phức tạp hơn
+
+Terminal Version:
+  ✓ Đơn giản
+  ✓ Nhanh
+  ✗ Khó dùng
+  ✗ Phải command line
+
+
+🎓 WORKFLOW TRÊN GUI
+──────────────────
+
+Tháng 1 - Người mới bắt đầu:
+  1. Tạo template: python create_templates.py
+  2. Chạy GUI: python gui_main.py
+  3. Chọn template
+  4. Kiểm tra 5-10 câu
+  5. Xem kết quả
+  6. Lưu kết quả
+
+Tháng 2-3 - Nâng cấp:
+  1. Sao chép template
+  2. Thêm dữ liệu mới
+  3. Lưu file mới
+  4. Import vào GUI
+  5. Kiểm tra 15-20 câu
+  6. So sánh kết quả cũ/mới
+
+
+📱 CHỨNG NĂNG CHI TIẾT (ADVANCED)
+─────────────────────────────────
+
+File: gui_main.py - Đã có:
+
+1. Tab chuẩn bị (Setup)
+   • select_excel_file() - Chọn file
+   • _load_excel_sheets() - Load sheets
+   • _read_excel_data() - Đọc Excel
+
+2. Tab kiểm tra (Quiz)
+   • display_question() - Hiển thị câu
+   • submit_answer() - Gửi trả lời
+   • show_hint() - Gợi ý
+   • show_answer() - Đáp án
+
+3. Tab kết quả (Results)
+   • show_results() - Tính kết quả
+   • save_results() - Lưu JSON
+
+4. Màu sắc, style, progress bar
+
+
+═══════════════════════════════════════════════════════════════
+
+Nếu có vấn đề, xem FAQ.txt hoặc README.md
+
+Chúc bạn sử dụng GUI vui vẻ! 🎉
+
+═══════════════════════════════════════════════════════════════

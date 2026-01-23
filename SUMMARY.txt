@@ -1,0 +1,203 @@
+═══════════════════════════════════════════════════════════════
+🎓 TÓMALẤY CHATBOT KIỂM TRA NGÔN NGỮ - BÀN GIAO ĐỦ ĐỦ
+═══════════════════════════════════════════════════════════════
+
+📦 CÁCH CẤPATNHẬN APP
+
+Thư mục: d:\Da Ngon Ngu\language_quiz_app\
+
+Cấu trúc đầy đủ:
+├── main.py                  (🎯 Chương trình chính - chạy file này!)
+├── quiz_engine.py           (⚙️ Xử lý hỏi đáp & kiểm tra)
+├── scorer.py                (📊 Hệ thống chấm điểm 0-100)
+├── data_loader.py           (📖 Đọc & quản lý dữ liệu)
+├── excel_to_json.py         (🔄 Chuyển file Excel sang JSON)
+├── advanced_features.py     (✨ Tính năng nâng cao)
+├── run.bat                  (🚀 Chạy trên Windows - nhấp đúp)
+├── run.sh                   (🚀 Chạy trên Linux/Mac)
+├── README.md                (📚 Hướng dẫn chi tiết đầy đủ)
+├── QUICK_START.txt          (⚡ Hướng dẫn nhanh)
+├── requirements.txt         (📦 Thư viện Python cần cài)
+└── data/                    (📁 Thư mục dữ liệu)
+    ├── sample_english.json  ✓ Mẫu tiếng Anh
+    ├── sample_chinese.json  ✓ Mẫu tiếng Trung
+    └── sample_japanese.json ✓ Mẫu tiếng Nhật
+
+
+🚀 CÁCH CHẠY (3 CÁCH)
+
+CÁCH 1 - Windows (đơn giản nhất):
+  → Vào thư mục language_quiz_app
+  → Nhấp đúp file: run.bat
+  → Ứng dụng khởi động!
+
+CÁCH 2 - Command Prompt/Terminal:
+  cd d:\Da Ngon Ngu\language_quiz_app
+  python main.py
+
+CÁCH 3 - PowerShell (Windows):
+  cd 'd:\Da Ngon Ngu\language_quiz_app'
+  python .\main.py
+
+
+✅ TÍNH NĂNG ĐÃ IMPLEMENT
+
+1. ✓ 3 NGÔN NGỮ
+   • Tiếng Anh (English)
+   • Tiếng Trung (Chinese)
+   • Tiếng Nhật (Japanese)
+
+2. ✓ 3 LOẠI KIỂM TRA
+   • Meaning: Hỏi ý nghĩa tiếng Việt → Học viên dịch
+   • Example: Hỏi dịch ví dụ → Dịch sang tiếng Việt
+   • Vietnamese: Hỏi dịch từ tiếng Việt → Dịch sang tiếng Anh
+
+3. ✓ LỰA CHỌN LINH HOẠT
+   • Chọn 5, 10, 15, 20 hoặc tất cả câu
+   • Trộn ngẫu nhiên câu hỏi mỗi lần
+
+4. ✓ HỆ THỐNG CHẤM ĐIỂM (0-100)
+   ┌─────────────────────────────┐
+   │ Lần trả lời 1 (đúng):  10 đ │
+   │ Lần trả lời 1 (gần):   8 đ  │
+   │ Lần trả lời 2 (đúng):  7 đ  │
+   │ Lần trả lời 2 (gần):   5 đ  │
+   │ Lần trả lời 3 (đúng):  4 đ  │
+   │ Sai hoàn toàn:         0 đ  │
+   └─────────────────────────────┘
+   
+   Xếp loại: A(90+), B(80+), C(70+), D(60+), F(<60)
+
+5. ✓ CHO PHÉP SỬA LỖI
+   • Tối đa 3 lần trả lời per câu
+   • Hỏi: "Bạn có muốn sửa không?"
+   • Gợi ý: h = hint, c = see answer
+
+6. ✓ GỢIY ĐÁP ÁN
+   • Gợi ý từ (hint): "*****" với vài ký tự đầu
+   • Xem đáp án: Hiển thị câu trả lời đúng
+   • Phân tích lỗi: So sánh câu trả lời của học viên
+
+7. ✓ THỐNG KÊ CHI TIẾT
+   • Tổng điểm & điểm trung bình
+   • Xếp loại cuối cùng
+   • Chi tiết từng câu (đúng/sai)
+   • In tóm tắt kết quả
+
+
+🔧 CHỨC NĂNG THÊM DỮ LIỆU
+
+Có 2 cách thêm dữ liệu của bạn:
+
+CÁCH 1 - Từ file Excel (được khuyếnNHẠI):
+  1. Chuẩn bị file Excel với cột:
+     A: word (từ)
+     B: meaning (ý nghĩa Việt)
+     C: example_en (ví dụ tiếng Anh)
+     D: example_vi (ví dụ Việt)
+  
+  2. Chạy: python excel_to_json.py
+  3. Nhập tên file Excel
+  4. Nhập tên file JSON output (vd: "english_h2.json")
+  5. Chạy lại main.py - dữ liệu mới xuất hiện!
+
+CÁCH 2 - Tạo file JSON trực tiếp:
+  Tạo file data/my_english.json:
+  [
+    {
+      "id": 1,
+      "word": "aunt",
+      "meaning": "cô, dì",
+      "example_en": "Is she your aunt?",
+      "example_vi": "Cô ấy là cô của bạn phải không?"
+    },
+    ...
+  ]
+
+
+📊 ĐIỂM SỐ - CÁCH TÍNH
+
+Ví dụ: Kiểm tra 5 câu, các câu được 10, 9, 7, 8, 8 điểm
+
+Tính:
+  - Tổng điểm: 10 + 9 + 7 + 8 + 8 = 42 điểm
+  - Điểm tối đa: 5 × 10 = 50 điểm
+  - Tỉ lệ: 42 / 50 = 0.84 = 84%
+  - Xếp loại: 84% → B (80-89)
+
+
+✨ TÍNH NĂNG TÙY CHỌN (có thể thêm sau)
+
+Nếu bạn muốn mở rộng app, tôi đã chuẩn bị:
+
+1. LƯỚI TIẾN ĐỘ - Lưu từ yếu + thống kê lịch sử
+   from advanced_features import UserProgress
+   
+2. PHÁT ÂM - Text-to-Speech cho từ vựng
+   from advanced_features import TextToSpeech
+   (cần: pip install pyttsx3)
+   
+3. ÔN TỪ YẾU - Mode chuyên biệt cho từ học viên sai nhiều
+   from advanced_features import WeakWordMode
+   
+4. XUẤT KẾT QUẢ - CSV / JSON / PDF
+   from advanced_features import ExportResults
+   
+5. THỐNG KÊ NÂNG CAO - Biểu đồ & xu hướng
+   from advanced_features import QuizStatistics
+
+
+❓ CÂU HỎI THƯỜNG GẶP
+
+Q: Tôi bấm run.bat nhưng không có gì xảy ra?
+A: Đảm bảo Python 3.8+ đã cài. Kiểm tra: python --version
+
+Q: Lỗi "ModuleNotFoundError: No module named 'openpyxl'"?
+A: Chạy: pip install openpyxl
+
+Q: Tôi muốn thêm dữ liệu từ file "H3 trung phần 2 ngay 06112025.xlsx"?
+A: 
+  1. Sao chép file vào thư mục language_quiz_app
+  2. Chạy: python excel_to_json.py
+  3. Nhập: H3 trung phần 2 ngay 06112025.xlsx
+  4. Nhập: chinese_h3_part2.json
+  5. Xong!
+
+Q: Tôi muốn ôn tập từ yếu?
+A: 
+  1. Edit main.py
+  2. Thêm: from advanced_features import WeakWordMode
+  3. Thêm mode "Weak Words" trong menu
+  
+Q: Có cách tùy chỉnh xếp loại không?
+A: Edit file scorer.py, hàm get_grade()
+
+
+🎯 BƯỚC TIẾP THEO
+
+1. ✅ Kiểm tra ứng dụng hoạt động:
+   python main.py
+
+2. ✅ Thêm dữ liệu của bạn:
+   python excel_to_json.py
+
+3. ✅ Ôn tập:
+   python main.py → Chọn ngôn ngữ → Chọn số câu
+
+4. ✅ (Tùy chọn) Thêm tính năng từ advanced_features.py
+
+
+📞 HỖTIỆU
+
+Tất cả code có comments tiếng Việt. 
+Tất cả lỗi sẽ hiển thị rõ ràng.
+Xem README.md và QUICK_START.txt để hiểu rõ hơn.
+
+
+═══════════════════════════════════════════════════════════════
+🎓 CHÚC BẠN VÀ HỌC VIÊN HỌC TẬP VUI VẼ! 🎓
+═══════════════════════════════════════════════════════════════
+
+Tạo bởi: AI Assistant
+Ngày: Tháng 1 2026
+Phiên bản: 1.0 (Đầy đủ)

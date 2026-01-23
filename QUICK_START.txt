@@ -1,0 +1,141 @@
+📚 HƯỚNG DẪN NHANH - CHATBOT KIỂM TRA NGÔN NGỮ
+================================================
+
+✨ TÍNH NĂNG CHÍNH
+─────────────────
+
+1. 🌐 LỰA CHỌN NGÔN NGỮ
+   • Tiếng Anh (English)
+   • Tiếng Trung (Chinese)
+   • Tiếng Nhật (Japanese)
+
+2. 📝 LOẠI KIỂM TRA
+   • Meaning: Hỏi ý nghĩa tiếng Việt
+   • Example: Dịch ví dụ
+   • Vietnamese: Dịch từ tiếng Việt sang
+
+3. 🎯 SỐ LƯỢNG CÂU
+   • 5 câu
+   • 10 câu
+   • 15 câu
+   • 20 câu
+   • Tất cả câu
+
+4. 💯 CHẤM ĐIỂM (0-100)
+   • 10/10: Lần 1 đúng hoàn hảo
+   • 8/10: Lần 1 gần đúng
+   • 7/10: Lần 2 đúng
+   • 0/10: Sai
+   • Xếp loại: A (90+), B (80+), C (70+), D (60+), F (<60)
+
+5. 🔧 TỰA CHỈ TRONG KIỂM TRA
+   • h = gợi ý từ
+   • c = xem đáp án
+   • Cho phép sửa tối đa 3 lần
+
+
+🚀 CÁCH SỬ DỤNG
+────────────────
+
+CHẠY LẦN ĐẦU:
+1. Mở Command Prompt/PowerShell
+2. Chạy: python main.py
+3. Hoặc nhấn đúp file run.bat (Windows)
+
+CHỌN LỰA CHỌN:
+1. Chọn ngôn ngữ (1-3)
+2. Chọn loại kiểm tra (1-3)
+3. Chọn số câu (1-5)
+4. Trả lời từng câu
+5. Xem kết quả
+
+
+📊 ĐIỂM SỐ
+──────────
+
+Tính toán:
+  Tổng điểm = (Điểm câu 1 + Câu 2 + ...) / (Số câu × 10) × 100
+
+Ví dụ: 5 câu, các câu được 9, 10, 7, 8, 8 = 42/50 = 84%
+
+
+🔨 THÊMNÊN DỮ LIỆU
+──────────────────
+
+Bước 1: Tạo file Excel với 4 cột:
+        A: word (từ)
+        B: meaning (ý nghĩa Việt)
+        C: example_en (ví dụ tiếng Anh)
+        D: example_vi (ví dụ Việt)
+
+Bước 2: Chạy: python excel_to_json.py
+        Nhập tên file Excel
+        Nhập tên file JSON output
+
+Bước 3: Chạy lại: python main.py
+        File mới sẽ xuất hiện trong danh sách
+
+
+⚡ PHÍM TẮT
+──────────
+
+Khi trả lời câu hỏi:
+  [Enter]  = Gửi câu trả lời
+  h        = Gợi ý (hint)
+  c        = Xem đáp án (correct)
+  c        = Tiếp tục (continue)
+  n        = Không tiếp tục (no)
+
+
+📁 CẤU TRÚC THƯ MỤC
+──────────────────
+
+language_quiz_app/
+  ├── main.py                 🎯 Chương trình chính
+  ├── quiz_engine.py          ⚙️ Xử lý kiểm tra
+  ├── scorer.py               📊 Chấm điểm
+  ├── data_loader.py          📖 Load dữ liệu
+  ├── excel_to_json.py        🔄 Chuyển Excel
+  ├── advanced_features.py    ✨ Tính năng nâng cao
+  ├── run.bat                 🚀 Chạy (Windows)
+  ├── run.sh                  🚀 Chạy (Linux/Mac)
+  ├── README.md               📚 Hướng dẫn chi tiết
+  ├── requirements.txt        📦 Thư viện cần cài
+  └── data/
+      ├── sample_english.json
+      ├── sample_chinese.json
+      ├── sample_japanese.json
+      └── (thêm file JSON mới ở đây)
+
+
+❓ HỎI ĐÁP
+─────────
+
+Q: Tôi chạy main.py nhưng báo lỗi?
+A: Cài Python 3.8+ từ python.org và thử lại
+
+Q: Làm sao thêm dữ liệu tiếng Trung của tôi?
+A: Xem phần "THÊM DỮ LIỆU" ở trên
+
+Q: Điểm của tôi sao lại cao/thấp?
+A: Xem chi tiết kết quả để biết câu nào đúng/sai
+
+Q: Làm sao phát âm được từ?
+A: Chạy: pip install pyttsx3
+   Sau đó edit main.py để thêm tính năng
+
+Q: Có cách sao lưu kết quả không?
+A: Chạy: python advanced_features.py
+   để xuất sang CSV hoặc JSON
+
+
+💡 MẸO
+──────
+
+1. Trả lời sai? Dùng phím "h" để xem gợi ý
+2. Lần thứ 2 đúng được 7 điểm, nên sửa lỗi sớm!
+3. Tập ôn từ yếu bằng cách lặp lại kiểm tra
+4. Lưu kết quả sau mỗi kiểm tra để theo dõi tiến độ
+
+
+🎓 CHÚC BẠN HỌC TẬP VUI VẺ! 🎓

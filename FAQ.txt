@@ -1,0 +1,411 @@
+═══════════════════════════════════════════════════════════════
+❓ CÂU HỎI THƯỜNG GẶP (FAQ)
+═══════════════════════════════════════════════════════════════
+
+🚀 CÀI ĐẶT VÀ CHẠY
+────────────────────
+
+Q1: Tôi chưa cài Python, làm thế nào?
+A: 
+  1. Truy cập: https://www.python.org/downloads/
+  2. Tải Python 3.9 hoặc 3.10 (khuyến nghị)
+  3. Chạy installer
+  4. ✓ Chọn "Add Python to PATH"
+  5. Click Install
+  6. Kiểm tra: cmd → gõ "python --version"
+
+
+Q2: Tôi nhấp file run.bat nhưng không có gì xảy ra?
+A:
+  Cách 1: Kiểm tra Python cài đặt
+    cmd → python --version
+    (Nếu báo lỗi, hãy cài Python)
+  
+  Cách 2: Chạy từ Command Prompt
+    cd d:\Da Ngon Ngu\language_quiz_app
+    python main.py
+  
+  Cách 3: Kiểm tra file bị hỏng
+    Tải lại file main.py
+
+
+Q3: Tôi bị lỗi "ModuleNotFoundError"?
+A:
+  Cài module bị thiếu:
+    pip install openpyxl
+  
+  Hoặc cài tất cả:
+    pip install -r requirements.txt
+
+
+Q4: Làm sao chạy nhanh nhất?
+A:
+  Cách 1: Windows → nhấp đúp run.bat
+  Cách 2: Terminal → python main.py
+  Cách 3: IDE (VS Code) → F5
+
+
+Q5: Tôi muốn chạy trên Mac/Linux?
+A:
+  1. Mở Terminal
+  2. cd /path/to/language_quiz_app
+  3. python3 main.py
+  
+  Hoặc: chmod +x run.sh && ./run.sh
+
+
+📊 VỀ DỮ LIỆU
+──────────────
+
+Q6: Tôi muốn thêm dữ liệu từ file Excel?
+A:
+  1. Chuẩn bị file Excel (4 cột: word, meaning, ex_en, ex_vi)
+  2. python excel_to_json.py
+  3. Nhập tên file Excel
+  4. Nhập tên file JSON output
+  5. Chạy lại main.py
+
+
+Q7: File Excel của tôi ở đâu?
+A:
+  Nên để ở: d:\Da Ngon Ngu\language_quiz_app\
+  Hoặc: d:\Da Ngon Ngu\ (thư mục cha)
+  
+  Script sẽ hỏi đường dẫn đầy đủ
+
+
+Q8: Format file Excel như thế nào?
+A:
+  Hàng 1 (tiêu đề): word | meaning | example_en | example_vi
+  Hàng 2+: dữ liệu
+  
+  Ví dụ:
+    aunt | cô, dì | Is she your aunt? | Cô ấy là cô?
+    love | yêu | Do you love it? | Bạn yêu nó?
+
+
+Q9: Tôi có nhiều file Excel, làm thế nào?
+A:
+  Cách 1: Convert từng file 1
+    python excel_to_json.py (lặp lại)
+  
+  Cách 2: Merge dữ liệu
+    Tạo file JSON chứa tất cả
+    Hoặc tạo nhiều file JSON riêng
+
+
+Q10: File JSON có thể sửa được không?
+A:
+  Có! Mở file .json bằng notepad
+  Format: [{ "id": 1, "word": "...", ... }]
+  
+  Lưu ý:
+  • Đóng dấu ngoặc đúng
+  • Sử dụng dấu phẩy đúng
+  • UTF-8 encoding
+
+
+📚 VỀ KIỂM TRA
+───────────────
+
+Q11: Loại kiểm tra nào tốt nhất?
+A:
+  • Meaning: Kiểm tra nhớ ý nghĩa
+  • Example: Kiểm tra dịch, ngữ pháp
+  • Vietnamese: Kiểm tra dịch chính xác
+  
+  → Nên xen kẽ tất cả để đa dạng
+
+
+Q12: Tôi bị sai lần đầu, có cách khác không?
+A:
+  Có! Kiểm tra cho phép sửa tối đa 3 lần:
+  • Lần 1 đúng: 10 điểm
+  • Lần 2 đúng: 7 điểm
+  • Lần 3 đúng: 4 điểm
+  → Sớm sửa lỗi càng tốt
+
+
+Q13: Gợi ý (hint) có đáng tin không?
+A:
+  Có! Gợi ý hiển thị:
+  • Vài ký tự đầu → Phần còn lại * * * *
+  • Từ Tiếng Anh
+  • Giúp bạn suy luận
+
+
+Q14: Xem đáp án (c) có được không?
+A:
+  Có, nhưng sẽ được 0 điểm
+  → Dùng nên xem sau khi thử 2-3 lần
+
+
+Q15: Có thể chọn kiểu câu hỏi không?
+A:
+  Có!
+  • Meaning: Từ → Ý nghĩa Việt
+  • Example: Dịch ví dụ tiếng Anh
+  • Vietnamese: Dịch tiếng Việt sang
+  
+  → Chọn trước khi bắt đầu
+
+
+💯 VỀ ĐIỂM SỐ
+───────────────
+
+Q16: Thang điểm như thế nào?
+A:
+  • 0-10 điểm: Mỗi câu
+  • 0-100 điểm: Tổng kiểm tra
+  
+  Ví dụ: 5 câu, điểm 10,9,7,8,8
+    → Tổng 42/50 = 84/100
+
+
+Q17: Xếp loại như thế nào?
+A:
+  • A (90-100): Xuất sắc
+  • B (80-89): Tốt
+  • C (70-79): Khá
+  • D (60-69): Đạt
+  • F (<60): Chưa đạt
+
+
+Q18: Lần 2 trả lời đúng được bao nhiêu?
+A:
+  • Lần 1 đúng: 10/10
+  • Lần 2 đúng: 7/10 (30% trừ)
+  • Lần 3 đúng: 4/10 (60% trừ)
+
+
+Q19: Sao điểm tôi thấp hơn expected?
+A:
+  Kiểm tra:
+  • Có trả lời gần đúng (8 điểm) không?
+  • Có sửa lại lần 2 không?
+  • Có sai hoàn toàn không?
+
+
+Q20: Có cách nào để lấy điểm 100?
+A:
+  Có! Kiểm tra tất cả câu:
+  • Lần 1 trả lời đúng 10/10
+  • Tất cả câu 10/10
+  → Điểm = 100/100
+
+
+⚙️ TÍNH NĂNG NÂNG CAO
+───────────────────
+
+Q21: Có thể phát âm từ được không?
+A:
+  Có! Nhưng cần cài thêm:
+    pip install pyttsx3
+  
+  Rồi edit advanced_features.py
+
+
+Q22: Có thể lưu tiến độ học không?
+A:
+  Có! Trong advanced_features.py:
+    from advanced_features import UserProgress
+    progress = UserProgress("tên_học_viên")
+    progress.record_result(...)
+
+
+Q23: Có thể ôn tập từ yếu không?
+A:
+  Có! Trong advanced_features.py:
+    from advanced_features import WeakWordMode
+    weak_words = [...từ yếu...]
+    mode = WeakWordMode(weak_words)
+
+
+Q24: Có thể xuất kết quả không?
+A:
+  Có! Trong advanced_features.py:
+    from advanced_features import ExportResults
+    ExportResults.export_to_csv(results, "file.csv")
+    ExportResults.export_to_json(results, "file.json")
+
+
+Q25: Có thống kê không?
+A:
+  Có! Sau mỗi kiểm tra:
+    • Tổng điểm
+    • Điểm trung bình
+    • Xếp loại
+    • Chi tiết từng câu
+
+
+🔧 TÙỶ CHỈNH
+──────────────
+
+Q26: Có thể thay đổi thang điểm không?
+A:
+  Có! Edit scorer.py
+  Hàm: def calculate_score(...)
+  Sửa: if attempt == 1: score = 10
+
+
+Q27: Có thể thay đổi ngôn ngữ không?
+A:
+  Có! Edit main.py
+  Hoặc config.json
+  Thêm ngôn ngữ mới trong languages dict
+
+
+Q28: Có thể thay đổi số câu không?
+A:
+  Có! Edit config.json
+  "question_options": [5, 10, 15, 20, 25, 30]
+
+
+Q29: Có thể bỏ gợi ý/đáp án không?
+A:
+  Có! Edit config.json
+  "hints": { "show_hint": false, "show_answer": false }
+
+
+Q30: Có thể thay đổi tính năng không?
+A:
+  Có! Tất cả code có comments tiếng Việt
+  Edit bất kỳ file .py nào
+  Thay đổi logic theo ý muốn
+
+
+🐛 KHẮC PHỤC LỖI
+──────────────────
+
+Q31: Lỗi "encoding"?
+A:
+  Giải pháp:
+  • Lưu file UTF-8
+  • Dùng Python 3.8+
+  • Tránh ký tự đặc biệt
+
+
+Q32: Lỗi "file not found"?
+A:
+  • Kiểm tra đường dẫn file
+  • Kiểm tra tên file (có dấu cách)
+  • Kiểm tra file tồn tại
+
+
+Q33: Lỗi "JSON decode"?
+A:
+  • File JSON bị hỏng
+  • Mở bằng notepad kiểm tra
+  • Xem có dấu ngoặc đúng không
+
+
+Q34: Lỗi "Dữ liệu trống"?
+A:
+  • File Excel hàng 1 là tiêu đề?
+  • Cột A-D có dữ liệu không?
+  • Chuyển đổi lại
+
+
+Q35: Lỗi "Python not found"?
+A:
+  • Cài Python 3.8+
+  • Chọn "Add Python to PATH"
+  • Khởi động lại máy
+
+
+💬 HỎI ĐÁP VỀ LỰA CHỌN
+────────────────────────
+
+Q36: Nên chọn bao nhiêu câu để kiểm tra?
+A:
+  • Người mới: 5-10 câu
+  • Bình thường: 10-15 câu
+  • Ôn tập: 20+ câu
+
+
+Q37: Nên kiểm tra bao lâu 1 lần?
+A:
+  • Hàng ngày: 5-10 câu
+  • Hàng tuần: 20 câu
+  • Hàng tháng: tất cả câu
+
+
+Q38: Nên chọn loại kiểm tra nào đầu tiên?
+A:
+  1. Meaning (dễ nhất)
+  2. Example (trung bình)
+  3. Vietnamese (khó nhất)
+
+
+Q39: Điểm D (60-69) có tốt không?
+A:
+  • Có: Vượt qua mức cơ bản
+  • Nên: Luyện lại để lên C-B-A
+
+
+Q40: Bao lâu sẽ thành thạo?
+A:
+  Phụ thuộc mục tiêu:
+  • 100 từ: 1-2 tuần
+  • 500 từ: 1 tháng
+  • 1000 từ: 2-3 tháng
+
+
+📱 KIẾN NGHỊ
+─────────────
+
+Q41: Tôi nên sử dụng ứng dụng như thế nào?
+A:
+  1. Luyện tập hàng ngày
+  2. Chọn 5-10 câu mỗi lần
+  3. Cố gắng lần đầu được 10 điểm
+  4. Ghi nhớ từ yếu
+  5. Kiểm tra lại sau 1 tuần
+
+
+Q42: Có thể học 3 ngôn ngữ cùng lúc?
+A:
+  Có thể, nhưng:
+  • Nên tập trung 1 ngôn ngữ
+  • Hoặc xen kẽ để không nhầm lẫn
+  • Ví dụ: T2-4 anh, T5-7 trung
+
+
+Q43: Tôi học lâu mà vẫn sai?
+A:
+  Nguyên nhân:
+  • Không ôn tập đều
+  • Không sử dụng ứng dụng
+  • Chỉ học 1-2 lần
+  
+  Giải pháp:
+  • Luyện tập hàng ngày
+  • Tăng số lần kiểm tra
+  • Dùng mode "Weak Words"
+
+
+Q44: Có thể sử dụng cùng nhau không?
+A:
+  Có! Chia sẻ file JSON
+  1. Một người tạo file
+  2. Share file .json
+  3. Người khác thêm vào thư mục data/
+  4. Kiểm tra chung
+
+
+Q45: Có thể dùng cho lớp học không?
+A:
+  Có! Cho cả lớp:
+  1. Chuẩn bị file dữ liệu
+  2. Phát file cho học viên
+  3. Học viên chạy ứng dụng
+  4. So sánh kết quả
+
+
+═══════════════════════════════════════════════════════════════
+Nếu còn câu hỏi, hãy xem:
+  • README.md - Hướng dẫn chi tiết
+  • QUICK_START.txt - Hướng dẫn nhanh
+  • ARCHITECTURE.txt - Kiến trúc app
+  • EXCEL_GUIDE.txt - Guide Excel
+═══════════════════════════════════════════════════════════════

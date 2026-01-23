@@ -1,0 +1,221 @@
+"""
+KIẾN TRÚC ỨNG DỤNG CHATBOT KIỂM TRA NGÔN NGỮ
+
+┌─────────────────────────────────────────────────────────┐
+│                      MAIN.PY                            │
+│              (Giao diện người dùng)                      │
+│                                                          │
+│  • Menu chọn ngôn ngữ                                   │
+│  • Menu chọn loại kiểm tra                              │
+│  • Menu chọn số lượng câu                               │
+│  • Hiển thị câu hỏi từng cái                            │
+│  • Lấy câu trả lời từ người dùng                        │
+│  • Hiển thị kết quả cuối cùng                           │
+└─────────────────────────────────────────────────────────┘
+              ↑                    ↓
+              │                    │
+    ┌─────────┴────────────────────┴──────────┐
+    │                                          │
+    ↓                                          ↓
+┌──────────────────┐              ┌──────────────────┐
+│  DATA_LOADER.PY  │              │ QUIZ_ENGINE.PY   │
+│  (Đọc dữ liệu)   │              │ (Xử lý kiểm tra) │
+│                  │              │                  │
+│ • load_json()    │              │ • format_q()     │
+│ • load_language()│              │ • check_answer() │
+│ • parse_txt()    │              │ • get_hint()     │
+│ • convert_excel()│              │ • get_progress() │
+└──────────────────┘              └──────────────────┘
+        ↓                                 ↑
+        │                                 │
+    data/                          ┌──────┴──────────┐
+ ├─ english.json                   │                  │
+ ├─ chinese.json                   ↓                  ↓
+ └─ japanese.json            ┌──────────────┐   ┌──────────────┐
+                             │  SCORER.PY   │   │ ADVANCED_    │
+                             │ (Chấm điểm)  │   │ FEATURES.PY  │
+                             │              │   │ (Mở rộng)    │
+                             │ • calc_score │   │              │
+                             │ • get_average│   │ • TTS        │
+                             │ • get_grade()│   │ • Weak words │
+                             │ • print_sum()│   │ • Export     │
+                             │              │   │ • Progress   │
+                             └──────────────┘   └──────────────┘
+                                    ↑
+                                    │
+                             (Lưu kết quả)
+
+
+╔════════════════════════════════════════════════════════════╗
+║              LUỒNG DỮ LIỆU CHÍNH                          ║
+╚════════════════════════════════════════════════════════════╝
+
+1. KHỞI ĐỘNG
+   └─→ main.py → data_loader.py → data/*.json
+
+2. CHỌN THAM SỐ
+   └─→ main.py (nhận lựa chọn ngôn ngữ, loại, số câu)
+
+3. CHUẨN BỊ KIỂM TRA
+   └─→ quiz_engine.py (load dữ liệu, trộn câu, định dạng)
+
+4. HỎI ĐÁPDỮ
+   main.py → quiz_engine.py → scorer.py → main.py
+   (vòng lặp tới khi hết câu)
+
+5. TÍNH TOÁN KẾT QUẢ
+   └─→ scorer.py (tính tổng, trung bình, xếp loại)
+
+6. IN KẾT QUẢ
+   └─→ main.py (in tóm tắt, chi tiết, gợi ý)
+
+
+╔════════════════════════════════════════════════════════════╗
+║              CẤU TRÚC DỮ LIỆU JSON                         ║
+╚════════════════════════════════════════════════════════════╝
+
+[
+  {
+    "id": 1,                    (ID câu hỏi)
+    "word": "aunt",             (Từ vựng)
+    "meaning": "cô, dì",        (Ý nghĩa Việt)
+    "example_en": "...",        (Ví dụ tiếng Anh)
+    "example_vi": "...",        (Ví dụ tiếng Việt)
+    "phonetic": "/ɑːnt/",       (Phát âm - tuỳ chọn)
+    "pinyin": "nǐ hǎo"          (Pinyin/Hiragana - tuỳ chọn)
+  },
+  ...
+]
+
+
+╔════════════════════════════════════════════════════════════╗
+║              QUY TRÌNH KIỂM TRA CHI TIẾT                  ║
+╚════════════════════════════════════════════════════════════╝
+
+QUSETION LOOP:
+├─ Hiển thị câu n / tổng
+├─ In câu hỏi (định dạng tuỳ loại)
+│
+├─ ANSWER LOOP (tối đa 3 lần):
+│  ├─ Hỏi người dùng trả lời
+│  ├─ Nếu 'h' → Hiển thị hint
+│  ├─ Nếu 'c' → Hiển thị đáp án
+│  ├─ Kiểm tra câu trả lời:
+│  │  ├─ Chính xác? → scorer.py (10/8 đ)
+│  │  ├─ Gần đúng? → scorer.py (8/5 đ)
+│  │  └─ Sai? → gợi ý sửa, lần tiếp
+│  ├─ Lưu kết quả: scorer.add_result()
+│  └─ Chuyển câu tiếp
+│
+└─ IN KẾT QUẢ
+   ├─ Tổng điểm
+   ├─ Điểm trung bình
+   ├─ Xếp loại
+   └─ Chi tiết từng câu
+
+
+╔════════════════════════════════════════════════════════════╗
+║              TÍNH TOÁN ĐIỂM                                ║
+╚════════════════════════════════════════════════════════════╝
+
+input: user_answer, correct_answer, attempt
+
+step 1: Chuẩn hóa
+   → Loại bỏ khoảng trắng, chữ hoa → chữ thường
+
+step 2: So sánh
+   → Chính xác? → match = True
+   → Gần đúng? → similarity >= 70% = match = True
+   → Sai → match = False
+
+step 3: Xác định điểm
+   ┌─ attempt=1
+   │  ├─ match=True  → 10 đ
+   │  ├─ similar=True → 8 đ
+   │  └─ else → 0 đ
+   │
+   ├─ attempt=2
+   │  ├─ match=True  → 7 đ
+   │  ├─ similar=True → 5 đ
+   │  └─ else → 0 đ
+   │
+   └─ attempt=3
+      ├─ match=True  → 4 đ
+      └─ else → 0 đ
+
+step 4: Return (score, feedback)
+
+
+╔════════════════════════════════════════════════════════════╗
+║              THÊM TÍNH NĂNG MỚI                            ║
+╚════════════════════════════════════════════════════════════╝
+
+Các tính năng nâng cao đã chuẩn bị trong advanced_features.py:
+
+1. UserProgress (Lưu tiến độ):
+   progress = UserProgress("tên_học_viên")
+   progress.record_result("English", "meaning", score=85, questions=10)
+   → Tự động lưu vào progress.json
+
+2. TextToSpeech (Phát âm):
+   tts = TextToSpeech()
+   tts.speak("Hello")
+   → Phát âm từ qua loa
+
+3. WeakWordMode (Ôn từ yếu):
+   weak_mode = WeakWordMode(weak_words_list)
+   quiz_questions = weak_mode.get_weak_word_quiz(10)
+   → Chỉ hỏi các từ học viên sai
+
+4. ExportResults (Xuất kết quả):
+   ExportResults.export_to_csv(results, "ket_qua.csv")
+   ExportResults.export_to_json(results, "ket_qua.json")
+   → Lưu kết quả dạng CSV/JSON
+
+5. QuizStatistics (Thống kê):
+   stats = QuizStatistics(results)
+   trend = stats.get_trend()
+   → Xem xu hướng cải thiện
+
+
+╔════════════════════════════════════════════════════════════╗
+║              TÒI HỖ TRỢ FILE                               ║
+╚════════════════════════════════════════════════════════════╝
+
+main.py
+├─ Chạy từ lệnh: python main.py
+├─ Chạy từ file: run.bat (Windows)
+├─ Chạy từ file: run.sh (Linux/Mac)
+└─ Hơn 400 dòng code
+
+excel_to_json.py
+├─ Chạy: python excel_to_json.py
+├─ Chuyển Excel → JSON
+└─ Hỗ trợ file Excel của bạn
+
+quiz_engine.py
+├─ Quản lý luồng kiểm tra
+├─ Format câu hỏi
+├─ So sánh trả lời
+└─ Hơn 200 dòng code
+
+scorer.py
+├─ Tính điểm
+├─ Chấm loại
+├─ Gợi ý sửa
+└─ Hơn 150 dòng code
+
+data_loader.py
+├─ Load JSON
+├─ Parse file văn bản
+└─ Hơn 100 dòng code
+
+advanced_features.py
+├─ Các tính năng tuỳ chọn
+└─ Hơn 250 dòng code
+
+
+═══════════════════════════════════════════════════════════════
+✨ TỔNG CỘNG: 1000+ dòng code, hoàn toàn lập trình Python
+═══════════════════════════════════════════════════════════════
+"""

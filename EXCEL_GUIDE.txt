@@ -1,0 +1,286 @@
+═══════════════════════════════════════════════════════════════
+📊 HƯỚNG DẪN CHUYÊN SÂU: CHUYỂN ĐỔI FILE EXCEL SANG JSON
+═══════════════════════════════════════════════════════════════
+
+🎯 MỤC ĐÍCH
+───────────
+Giúp bạn sử dụng file Excel có sẵn (H3 trung, anh v.v.)
+làm dữ liệu cho ứng dụng kiểm tra ngôn ngữ
+
+
+📝 CHUẨN BỊ FILE EXCEL
+──────────────────────
+
+Bước 1: Mở file Excel hoặc tạo file mới
+
+Bước 2: Tổ chức dữ liệu thành 4 cột:
+
+  ┌────────────────────────────────────────────────────────┐
+  │  A (Word)   │  B (Meaning)  │  C (En Ex)  │  D (Vi Ex)  │
+  ├────────────────────────────────────────────────────────┤
+  │  aunt       │  cô, dì       │ Is she...?  │ Cô ấy là... │
+  │  love       │  yêu, thích   │ Do you...?  │ Bạn có...?  │
+  │  white      │  màu trắng    │ Is your...? │ Áo của...?  │
+  │  help       │  giúp đỡ      │ Can you...? │ Bạn giúp...?│
+  │  hundred    │  một trăm     │ Do you...?  │ Bạn có 100..│
+  └────────────────────────────────────────────────────────┘
+
+  Cột A (Word):
+    - Từ vựng cần học
+    - Có thể tiếng Anh, Trung, Nhật
+    - VD: aunt, 你好, こんにちは
+
+  Cột B (Meaning):
+    - Ý nghĩa tiếng Việt của từ
+    - Có thể viết ngắn gọn
+    - VD: cô, dì, bác gái
+
+  Cột C (example_en):
+    - Ví dụ câu sử dụng từ (tiếng Anh)
+    - Câu hỏi hoặc câu mẫu
+    - VD: Is she your aunt?
+
+  Cột D (example_vi):
+    - Dịch ví dụ sang tiếng Việt
+    - Dịch câu trên sang Việt
+    - VD: Cô ấy là cô của bạn phải không?
+
+Bước 3: Lưu file Excel
+  - Định dạng: .xlsx hoặc .xls
+  - Tên file có thể là bất kỳ (vd: "file sach h2 anh.xlsx")
+  - Để ý: Hàng 1 là tiêu đề, bắt đầu từ hàng 2
+
+
+⚡ VÍ DỤ CHI TIẾT
+─────────────────
+
+Ví dụ 1: Tiếng Anh
+
+  Word        │ Meaning         │ Example EN              │ Example VI
+  ────────────┼─────────────────┼─────────────────────────┼──────────────────
+  aunt        │ cô, dì          │ Is she your aunt?      │ Cô ấy là cô của bạn?
+  love        │ yêu, thích      │ Do you love this song? │ Bạn yêu bài hát này?
+  white       │ màu trắng       │ Is your shirt white?   │ Áo bạn màu trắng?
+  hundred     │ một trăm        │ Do you have a hundred? │ Bạn có 100 đô?
+  help        │ giúp đỡ         │ Can you help me?       │ Bạn giúp tôi không?
+
+
+Ví dụ 2: Tiếng Trung
+
+  Word        │ Meaning         │ Example EN (Pinyin)     │ Example VI
+  ────────────┼─────────────────┼─────────────────────────┼──────────────────
+  你好        │ xin chào        │ Nǐ hǎo                  │ Xin chào
+  谢谢        │ cảm ơn          │ Xiè xie                 │ Cảm ơn
+  再见        │ tạm biệt        │ Zài jiàn                │ Tạm biệt
+  对不起      │ xin lỗi         │ Duì bu qǐ              │ Xin lỗi
+  学生        │ học sinh        │ Xué sheng              │ Sinh viên
+
+
+Ví dụ 3: Tiếng Nhật
+
+  Word        │ Meaning         │ Example EN (Romaji)     │ Example VI
+  ────────────┼─────────────────┼─────────────────────────┼──────────────────
+  こんにちは  │ xin chào        │ Konnichiha              │ Xin chào
+  ありがとう  │ cảm ơn          │ Arigatou                │ Cảm ơn
+  さようなら  │ tạm biệt        │ Sayounara               │ Tạm biệt
+  すみません  │ xin lỗi         │ Sumimasen               │ Xin lỗi
+  がくせい    │ học sinh        │ Gakusei                 │ Sinh viên
+
+
+🔄 QUYTRÌNH CHUYỂN ĐỔI
+──────────────────────
+
+Bước 1: Sao chép file Excel
+  → Đặt file Excel vào thư mục: d:\Da Ngon Ngu\language_quiz_app\
+  (hoặc thư mục cha - sẽ có hỏi)
+
+Bước 2: Mở PowerShell/Command Prompt
+  → Trên Windows: Nhấp Start → gõ "cmd"
+  → Chuyển đến thư mục:
+     cd d:\Da Ngon Ngu\language_quiz_app
+
+Bước 3: Chạy script chuyển đổi
+  → Gõ: python excel_to_json.py
+  → Nhấn Enter
+
+Bước 4: Nhập thông tin
+  → Script sẽ yêu cầu:
+     "Nhập tên file Excel: " → Gõ "file sach h2 anh.xlsx"
+     "Nhập tên file JSON: " → Gõ "english_h2.json"
+  → Nhấn Enter
+
+Bước 5: Chuyển đổi hoàn tất!
+  → Xem tin nhắn: "✓ Chuyển đổi thành công!"
+  → File JSON xuất hiện trong thư mục data/
+
+Bước 6: Kiểm tra file JSON
+  → Mở file data/english_h2.json
+  → Xem có dữ liệu không?
+
+Bước 7: Chạy lại main.py
+  → Dữ liệu mới xuất hiện trong danh sách chọn!
+
+
+📂 NƠI ĐẶT FILE EXCEL
+─────────────────────
+
+Nơi tìm file Excel của bạn:
+1. Nếu file trong: d:\Da Ngon Ngu\
+   → Để nguyên vị trí
+   → Script sẽ tìm trong thư mục cha
+
+2. Nếu muốn để trong: d:\Da Ngon Ngu\language_quiz_app\
+   → Sao chép vào thư mục này
+   → Script sẽ tìm ngay trong thư mục hiện tại
+
+3. Nếu muốn để ở nơi khác:
+   → Edit script excel_to_json.py
+   → Thay đổi dòng: filepath = f"../{excel_file}"
+
+
+✅ KIỂM TRA LỖI
+────────────────
+
+Lỗi 1: "File not found"
+  Giải pháp:
+  • Kiểm tra tên file (có chính tả không?)
+  • Kiểm tra file .xlsx hoặc .xls?
+  • Kiểm tra file có dữ liệu không?
+
+Lỗi 2: "No module named openpyxl"
+  Giải pháp:
+  • Cài: pip install openpyxl
+  • Thử lại: python excel_to_json.py
+
+Lỗi 3: "Empty data or invalid format"
+  Giải pháp:
+  • Kiểm tra cột A có chứa từ vựng không?
+  • Kiểm tra cột B có chứa ý nghĩa không?
+  • Hàng tiêu đề là hàng 1, dữ liệu từ hàng 2
+
+Lỗi 4: "Encoding error" (ký tự lạ)
+  Giải pháp:
+  • Lưu file Excel dưới UTF-8
+  • Hoặc cài python 3.8+ và thử lại
+
+
+🎯 CÁC BỨC SNẤP SAI LẦM THƯỜNG GẶP
+────────────────────────────────────
+
+❌ SAI: Đặt tiêu đề ở hàng 2
+✓ ĐÚNG: Đặt tiêu đề ở hàng 1, dữ liệu từ hàng 2
+
+❌ SAI: Cột A là số thứ tự
+✓ ĐÚNG: Cột A là từ vựng cần học
+
+❌ SAI: Để ô trống trong cột A-D
+✓ ĐÚNG: Điền đầy đủ tất cả ô
+
+❌ SAI: Lưu file dạng .csv hoặc .xlsx (sai encoding)
+✓ ĐÚNG: Lưu dạng .xlsx (Excel 2016+)
+
+❌ SAI: Gõ tên file không có đuôi
+✓ ĐÚNG: Gõ đầy đủ "file.xlsx"
+
+
+📝 SCRIPT CONVERSION HOẠT ĐỘNG NHƯ THẾ NÀO?
+─────────────────────────────────────────────
+
+Input: file_sach_h2_anh.xlsx
+        ├─ Dòng 1: Tiêu đề (tự động bỏ qua)
+        ├─ Dòng 2-100: Dữ liệu
+
+Process:
+  ├─ Đọc từng dòng
+  ├─ Lấy 4 cột (A, B, C, D)
+  ├─ Kiểm tra dòng trống (bỏ qua)
+  ├─ Tạo object JSON:
+  │  {
+  │    "id": 1,
+  │    "word": "aunt",
+  │    "meaning": "cô, dì",
+  │    "example_en": "Is she...?",
+  │    "example_vi": "Cô ấy..."
+  │  }
+  └─ Lưu vào danh sách
+
+Output: data/english_h2.json
+         └─ Mảng JSON chứa tất cả câu
+
+
+🔍 KIỂM TOÁN KẾT QUẢ
+────────────────────
+
+Sau khi convert, hãy:
+
+1. Mở file data/english_h2.json
+2. Kiểm tra:
+   • Tất cả từ có mặt không?
+   • ID từ 1 đến N?
+   • Không có ô trống?
+3. Chạy main.py
+4. Chọn ngôn ngữ → Thấy file mới?
+5. Kiểm tra dữ liệu:
+   • Câu hỏi hiển thị đúng?
+   • Gợi ý có chính xác?
+   • Đáp án có đúng?
+
+
+💡 MẸO CHUYÊN NGHIỆP
+────────────────────
+
+Mẹo 1: Backup file gốc
+  Sao chép file Excel trước khi convert
+  
+Mẹo 2: Tạo nhiều file JSON cho cùng ngôn ngữ
+  english_h1.json
+  english_h2.json
+  english_h3.json
+  → Có thể chọn từng cấp độ riêng
+
+Mẹo 3: Kiểm tra dữ liệu trước
+  Xem lại file Excel trước khi convert
+  Xóa hàng trống, kiểm tra chính tả
+
+Mẹo 4: Tổ chức thư mục
+  data/
+  ├─ english/
+  │  ├─ h1.json
+  │  ├─ h2.json
+  │  └─ h3.json
+  ├─ chinese/
+  │  └─ h3.json
+  └─ japanese/
+     └─ h2.json
+
+Mẹo 5: Automati hóa
+  Chuẩn bị nhiều file Excel
+  Chạy excel_to_json.py liên tục
+
+
+🚀 BATCH CONVERT (NÂNG CAO)
+─────────────────────────────
+
+Nếu có nhiều file Excel:
+
+Cách 1: Thủ công
+  python excel_to_json.py
+  → File 1
+  → File 2
+  → File 3
+
+Cách 2: Tự động (edit excel_to_json.py)
+  Thêm:
+  files = [
+    ("file1.xlsx", "output1.json"),
+    ("file2.xlsx", "output2.json"),
+    ("file3.xlsx", "output3.json")
+  ]
+  
+  for excel_file, json_file in files:
+    convert_excel_to_json(excel_file, json_file)
+
+
+═══════════════════════════════════════════════════════════════
+Chúc bạn chuyển đổi dữ liệu thành công! 🎉
+═══════════════════════════════════════════════════════════════

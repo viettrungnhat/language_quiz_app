@@ -1,0 +1,61 @@
+{
+  "app_name": "Chatbot Kiểm Tra Ngôn Ngữ",
+  "version": "1.0",
+  
+  "scoring": {
+    "max_score_per_question": 10,
+    "attempt_1": {
+      "correct": 10,
+      "similar": 8,
+      "wrong": 0
+    },
+    "attempt_2": {
+      "correct": 7,
+      "similar": 5,
+      "wrong": 0
+    },
+    "attempt_3": {
+      "correct": 4,
+      "similar": 2,
+      "wrong": 0
+    },
+    "similarity_threshold": 0.7
+  },
+  
+  "grading_scale": {
+    "A": [90, 100],
+    "B": [80, 89],
+    "C": [70, 79],
+    "D": [60, 69],
+    "F": [0, 59]
+  },
+  
+  "languages": {
+    "english": "sample_english.json",
+    "chinese": "sample_chinese.json",
+    "japanese": "sample_japanese.json"
+  },
+  
+  "quiz_types": {
+    "meaning": "Hỏi ý nghĩa (Từ → Tiếng Việt)",
+    "example": "Hỏi dịch ví dụ",
+    "vietnamese": "Dịch từ Tiếng Việt"
+  },
+  
+  "question_options": [5, 10, 15, 20],
+  
+  "max_attempts_per_question": 3,
+  
+  "hints": {
+    "show_hint": true,
+    "show_answer": true,
+    "allow_correction": true
+  },
+  
+  "features": {
+    "save_progress": false,
+    "text_to_speech": false,
+    "weak_word_mode": false,
+    "export_results": false
+  }
+}

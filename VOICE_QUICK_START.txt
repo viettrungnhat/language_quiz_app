@@ -1,0 +1,104 @@
+═══════════════════════════════════════════════════════════════════════════════
+⚡ QUICK START - KIỂM TRA GIỌNG NÓI (5 PHÚT)
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 MỤC TIÊU: Chạy được Voice Quiz trong 5 phút
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📝 BƯỚC 1: CÀI ĐẶT PACKAGES (2 phút)
+
+Mở PowerShell/Command Prompt và chạy:
+
+   pip install pyttsx3 SpeechRecognition pyaudio openpyxl
+
+⏳ Chờ cài đặt xong...
+
+(Nếu pyaudio bị lỗi trên Windows, xem VOICE_QUIZ_GUIDE.txt)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🚀 BƯỚC 2: CHẠY CHƯƠNG TRÌNH (1 phút)
+
+CÁCH ĐƠN GIẢN NHẤT - Windows:
+
+   1. Mở thư mục: d:\Da Ngon Ngu\language_quiz_app
+   2. Nhấp đúp: run_gui_v2.bat
+   3. Chờ GUI mở...
+
+HOẶC chạy trực tiếp:
+
+   python gui_main_v2.py
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🎤 BƯỚC 3: TỰ KIỂM TRA GIỌNG NÓI (2 phút)
+
+1. Tab "📋 Chuẩn bị":
+   ✓ Nhấn "📁 Chọn File Excel..."
+   ✓ Chọn file: TEMPLATE_ENGLISH.xlsx (hoặc file của bạn)
+   ✓ Chọn: Meaning - Hỏi ý nghĩa
+   ✓ Chọn: 5 câu
+   ✓ Nhấn: "🎤 KIỂM TRA GIỌNG NÓI"
+
+2. Giao diện sẽ chuyển sang tab "🎤 Kiểm tra Giọng Nói"
+
+3. Máy sẽ:
+   - Hiển thị câu hỏi
+   - Phát âm thanh câu hỏi
+   - Chờ bạn nói
+
+4. Bạn:
+   - Nghe máy hỏi
+   - Nói câu trả lời vào microphone
+   - Nhấn "🎤 NGHE GIỌNG NÓI"
+
+5. Máy sẽ:
+   - Nhận dạng câu bạn nói
+   - So sánh với đáp án đúng
+   - Cho điểm (0-10)
+   - Hiển thị feedback
+
+6. Bạn nhấn "⏭️ CÂU HỎI TIẾP" để sang câu tiếp theo
+
+7. Sau câu cuối, tự động xem kết quả!
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ HOÀN THÀNH!
+
+Bây giờ bạn đã có ứng dụng kiểm tra tiếng anh với:
+✓ Giao diện đồ họa (GUI)
+✓ Kiểm tra thường (text)
+✓ Kiểm tra bằng giọng nói (Voice) ⭐
+✓ Đánh giá tự động (0-100)
+✓ Lưu kết quả (JSON)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🆘 LỖI PHỔ BIẾN
+
+❌ "ModuleNotFoundError: pyttsx3"
+   → Chạy: pip install pyttsx3
+
+❌ "Không tìm thấy microphone"
+   → Kiểm tra microphone kết nối chưa?
+   → Kiểm tra Windows Settings → Sound
+
+❌ "Không nhận dạng được giọng nói"
+   → Nói rõ ràng hơn
+   → Kiểm tra kết nối internet (Google STT cần internet)
+
+❌ "Máy không phát âm"
+   → Kiểm tra loa bật chưa?
+   → Kiểm tra âm lượng Windows
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📚 ĐỌC THÊM
+
+Hướng dẫn chi tiết: VOICE_QUIZ_GUIDE.txt
+Hướng dẫn GUI:      GUI_GUIDE.txt
+Hướng dẫn nâng cao: README.md
+
+═══════════════════════════════════════════════════════════════════════════════

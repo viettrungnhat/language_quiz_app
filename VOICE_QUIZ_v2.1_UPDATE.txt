@@ -1,0 +1,225 @@
+═══════════════════════════════════════════════════════════════════════════════
+🎉 PHIÊN BẢN v2.1 - VOICE QUIZ NÂNG CẤP (Google TTS)
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 CẬP NHẬT CHÍNH:
+   ✅ Thay TTS: pyttsx3 → Google TTS (gTTS) - Đọc tự nhiên hơn
+   ✅ Tự động đọc câu hỏi 2 lần
+   ✅ Tự động lắng nghe sau khi đọc
+   ✅ Fix lỗi NameError & AttributeError
+   ✅ Nhận dạng giọng nói tốt hơn
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🆕 FILE MỚI THÊM:
+   voice_quiz_v2.py - Module Voice Quiz cải tiến với Google TTS
+
+🔄 FILE CẬP NHẬT:
+   gui_main_v2.py - Tích hợp voice_quiz_v2
+   requirements.txt - Thêm gtts, bỏ pyttsx3
+   run_gui_v2.bat - Update packages
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📥 CÀI ĐẶT PACKAGES:
+
+   pip install gtts SpeechRecognition openpyxl pygame
+
+Hoặc chạy:
+   
+   python run_gui_v2.bat
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🎤 QUY TRÌNH KIỂM TRA GIỌNG NÓI v2.1:
+
+1️⃣ GUI Hiển thị câu hỏi
+   ├─ Example: "What does 'beautiful' mean?"
+
+2️⃣ Máy đọc câu hỏi LẦN 1
+   ├─ Phát âm bằng Google TTS (tự nhiên + đa ngôn ngữ)
+   └─ Chất lượng: ⭐⭐⭐⭐⭐ (rất tốt)
+
+3️⃣ Chờ 1 giây
+
+4️⃣ Máy đọc câu hỏi LẦN 2
+   ├─ Phát âm lần nữa để chắc chắn
+   └─ Chất lượng: ⭐⭐⭐⭐⭐
+
+5️⃣ Tự động lắng nghe từ microphone
+   ├─ Không cần nhấn nút "NGHE GIỌNG NÓI"
+   ├─ Hiển thị: ⏳ Tự động lắng nghe từ microphone...
+   └─ Thời gian: Max 10 giây
+
+6️⃣ Người dùng nói câu trả lời
+   ├─ Example: "Something that looks nice"
+
+7️⃣ Máy nhận dạng + so sánh
+   ├─ Hiển thị: 🎤 Bạn nói: Something that looks nice
+   ├─ So sánh với: "Something that is aesthetically pleasing"
+   ├─ Độ tương đồng: ~70%
+   └─ Điểm: 7/10 ⚠️ Khá
+
+8️⃣ Hiển thị feedback
+   ├─ ⚠️ Khá! Độ chính xác 70%
+   ├─ 📝 Đúng: Something that is aesthetically pleasing
+   └─ Chuyển sang câu tiếp theo
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✨ SỰ KHÁC BIỆT v2.1 vs v2.0:
+
+v2.0 (Cũ):
+   ❌ Dùng pyttsx3 (đọc kém)
+   ❌ Cần nhấn nút "NGHE GIỌNG NÓI"
+   ❌ Nhận dạng giọng nói không ổn định
+
+v2.1 (Mới):
+   ✅ Dùng Google TTS (đọc tự nhiên)
+   ✅ Tự động lắng nghe (không cần nhấn nút)
+   ✅ Đọc 2 lần (chắc chắn người dùng nghe)
+   ✅ Nhận dạng chuẩn hơn (Google Speech)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🔧 CÁC MODULE:
+
+voice_quiz_v2.py:
+   - VoiceManager
+     ├─ speak_google_tts(text, language) ← Google TTS online
+     ├─ listen_to_microphone(timeout, language) ← Google STT
+     └─ Hỗ trợ: English, Vietnamese, Chinese, Japanese
+   
+   - VoiceQuizManager
+     ├─ ask_question_voice(text, language, repeat=2) ← Hỏi 2 lần + lắng nghe
+     └─ compare_answers(user_ans, correct_ans) ← So sánh
+
+gui_main_v2.py:
+   - voice_display_question() → Hiển thị + phát câu hỏi
+   - _speak_question() → Đọc 2 lần + tự động lắng nghe
+   - _voice_listen_thread() → Xử lý STT + scoring
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🚀 CHẠY NGAY:
+
+Windows:
+   1. cd d:\Da Ngon Ngu\language_quiz_app
+   2. python run_gui_v2.bat
+   3. Hoặc: python gui_main_v2.py
+
+Linux/Mac:
+   1. cd ~/Language_Quiz
+   2. pip install gtts SpeechRecognition openpyxl
+   3. python gui_main_v2.py
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📊 CHẤM ĐIỂM:
+
+Dựa trên độ tương đồng (Sequence Matching):
+
+   100% → 10 điểm ✅ Chính xác
+   80-99% → 8-10 điểm ✅ Tốt
+   70-79% → 5-7 điểm ⚠️ Khá
+   50-69% → 2-4 điểm ❌ Yếu
+   <50% → 0 điểm ❌ Sai
+
+═══════════════════════════════════════════════════════════════════════════════
+
+❌ FIX CÁC LỖI:
+
+1. NameError (Line 637):
+   ❌ OLD: lambda: messagebox.showerror("Lỗi", f"Lỗi: {e}")
+   ✅ NEW: lambda msg=error_msg: messagebox.showerror("Lỗi", f"Lỗi: {msg}")
+   Nguyên nhân: Variable 'e' không scope trong lambda
+
+2. AttributeError (Line 550):
+   ❌ OLD: self.quiz_engine.questions (quiz_engine = None)
+   ✅ NEW: if self.quiz_engine and self.current_question_idx < len(...)
+   Nguyên nhân: quiz_engine chưa được initialize
+
+3. voice_listen (Line 602):
+   ❌ OLD: Cần nhấn nút "NGHE GIỌNG NÓI"
+   ✅ NEW: Tự động lắng nghe sau khi đọc
+   Nguyên nhân: Nên tự động lắng nghe để UX tốt hơn
+
+═══════════════════════════════════════════════════════════════════════════════
+
+⚙️ CẤU HÌNH:
+
+Chỉnh trong voice_quiz_v2.py:
+
+1. Số lần đọc câu hỏi:
+   ask_question_voice(text, repeat=2)
+   Thay 2 thành số khác (1, 2, 3...)
+
+2. Thời gian lắng nghe:
+   listen_to_microphone(timeout=10)
+   Thay 10 thành số khác (5, 15, 20...)
+
+3. Ngôn ngữ:
+   speak_google_tts(text, language="en")
+   "en" → English
+   "vi" → Vietnamese
+   "zh-cn" → Chinese
+   "ja" → Japanese
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🌍 NGÔN NGỮ HỖ TRỢ:
+
+Google TTS hỗ trợ 100+ ngôn ngữ:
+   ✅ English (en)
+   ✅ Vietnamese (vi)
+   ✅ Mandarin Chinese (zh-cn)
+   ✅ Japanese (ja)
+   ✅ Korean (ko)
+   ✅ Spanish (es)
+   ✅ French (fr)
+   ... và nhiều ngôn ngữ khác
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📞 TROUBLESHOOTING:
+
+Q: "ModuleNotFoundError: gtts"
+A: pip install gtts
+
+Q: "Không có âm thanh"
+A: • Kiểm tra loa/headphone
+   • Kiểm tra âm lượng Windows
+   • Cần kết nối internet
+
+Q: "Không nhận dạng giọng nói"
+A: • Nói rõ ràng hơn
+   • Kiểm tra microphone
+   • Kiểm tra internet (Google Speech cần online)
+
+Q: "Lỗi: [Errno 32512]"
+A: Pygame playback issue
+   Solution: Hệ thống sẽ fallback để phát file audio
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📊 KỲ VỌNG HỌC SINH:
+
+Trước (v2.0):
+   • Khó nghe câu hỏi
+   • Phải nhấn nút
+   • Nhận dạng kém
+   • UX không smooth
+
+Sau (v2.1):
+   • Nghe rõ ràng (Google TTS)
+   • Tự động lắng nghe
+   • Nhận dạng chuẩn
+   • UX mượt mà
+
+Kết quả: Luyện tập tốt hơn → Hiệu quả cao hơn! 📈
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Cảm ơn bạn đã nâng cấp lên v2.1! 🚀
+
+Language Quiz v2.1 - Made with ❤️ for Language Learners

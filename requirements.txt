@@ -1,0 +1,10 @@
+openpyxl>=3.0.0
+
+# GUI support (tkinter is built-in with Python)
+# On Linux: sudo apt-get install python3-tk
+
+# Voice Quiz support v2.0 (Google TTS + Speech Recognition)
+gtts>=2.2.4  # Google Text-to-Speech (Online, better quality)
+SpeechRecognition>=3.10.0  # Speech-to-Text (Google)
+pyaudio>=0.2.11  # Microphone support (optional, for advanced features)
+pygame>=2.1.0  # Audio playback (alternative to system audio)
