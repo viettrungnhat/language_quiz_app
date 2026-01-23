@@ -1536,10 +1536,10 @@ class LanguageQuizGUI:
         return popup
     
     def _show_manual_close_popup(self, title, message):
-        """Hiển thị popup (TTS thread sẽ tự đóng khi phát xong)"""
+        """Hiển thị popup với hình ảnh nhân vật động (TTS thread sẽ tự đóng khi phát xong)"""
         popup = tk.Toplevel(self.root)
         popup.title(title)
-        popup.geometry("550x380")
+        popup.geometry("550x480")
         popup.resizable(False, False)
         
         # 🎨 Set icon cho popup
@@ -1552,8 +1552,8 @@ class LanguageQuizGUI:
         # Center popup
         popup.update_idletasks()
         x = (popup.winfo_screenwidth() // 2) - (550 // 2)
-        y = (popup.winfo_screenheight() // 2) - (380 // 2)
-        popup.geometry(f"550x380+{x}+{y}")
+        y = (popup.winfo_screenheight() // 2) - (480 // 2)
+        popup.geometry(f"550x480+{x}+{y}")
         
         # Xác định màu sắc dựa trên title
         if "Chính Xác" in title or "Đúng" in title:
@@ -1574,21 +1574,65 @@ class LanguageQuizGUI:
         # Title
         title_label = tk.Label(main_frame, text=title, font=("Arial", 16, "bold"),
                               fg=title_color, bg=bg_color)
-        title_label.pack(pady=(0, 15))
+        title_label.pack(pady=(0, 10))
+        
+        # 🎨 Load + Display Animated GIF
+        img_label = tk.Label(main_frame, bg=bg_color)
+        img_label.pack(pady=10)
+        
+        gif_path = Path(__file__).parent / "anh1.gif"
+        if gif_path.exists():
+            try:
+                from PIL import Image, ImageTk
+                from PIL import ImageSequence
+                
+                # Load GIF
+                gif_image = Image.open(gif_path)
+                
+                # Extract all frames
+                frames = []
+                for frame_idx in range(gif_image.n_frames):
+                    gif_image.seek(frame_idx)
+                    # Resize frame
+                    frame = gif_image.convert("RGBA").copy()
+                    frame.thumbnail((200, 150), Image.Resampling.LANCZOS)
+                    # Convert to PhotoImage
+                    photo = ImageTk.PhotoImage(frame)
+                    frames.append(photo)
+                
+                # Animation loop
+                frame_index = [0]
+                def animate_gif():
+                    if not popup.winfo_exists():
+                        return
+                    
+                    img_label.config(image=frames[frame_index[0]])
+                    frame_index[0] = (frame_index[0] + 1) % len(frames)
+                    # Update mỗi 100ms (điều chỉnh tốc độ nếu cần)
+                    popup.after(100, animate_gif)
+                
+                # Start animation
+                animate_gif()
+                
+            except Exception as e:
+                print(f"⚠️ Lỗi load GIF: {e}")
+                error_label = tk.Label(main_frame, text="❌ Không load được GIF", 
+                                      font=("Arial", 10), fg="red", bg=bg_color)
+                error_label.pack()
         
         # Message
-        msg_label = tk.Label(main_frame, text=message, font=("Arial", 13, "bold"),
+        msg_label = tk.Label(main_frame, text=message, font=("Arial", 12, "bold"),
                             fg=text_color, justify=tk.LEFT, wraplength=480, bg=bg_color)
-        msg_label.pack(pady=20)
+        msg_label.pack(pady=10)
         
         # Hiển thị trạng thái
         status_label = tk.Label(main_frame, text="🔊 Đang phát giọng nói...",
                                font=("Arial", 10), fg="blue", bg=bg_color)
-        status_label.pack(pady=10)
+        status_label.pack(pady=8)
         
         # Button đóng
         btn_frame = tk.Frame(main_frame, bg=bg_color)
-        btn_frame.pack(pady=15)
+        btn_frame.pack(pady=12)
         
         close_btn = tk.Button(btn_frame, text="OK", command=popup.destroy,
                              font=("Arial", 11, "bold"), width=15,
