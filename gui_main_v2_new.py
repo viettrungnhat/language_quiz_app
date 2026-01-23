@@ -1143,7 +1143,7 @@ class LanguageQuizGUI:
                     vn_question = f"Câu '{meaning_part}' dịch sang {lang_name} là gì?"
                 
                 print(f"📢 [Mode 1] Đọc câu hỏi VN: {vn_question[:60]}...")
-                self.voice_manager.voice_manager.speak(vn_question, language="vi", use_polly=False)
+                self.voice_manager.voice_manager.speak_google_tts(vn_question, language="vi")
                 time.sleep(0.3)
             
             # Mode 2: Đọc Foreign language (Polly) + Câu hỏi VN (gTTS) - User trả lời bằng Tiếng Việt
@@ -1158,8 +1158,8 @@ class LanguageQuizGUI:
                 tts_lang = lang_map.get(quiz_lang, "en")
                 
                 # Đọc từ/câu tiếng nước ngoài
-                print(f"📢 [Mode 2] Đọc {quiz_lang} (Polly): {foreign_part[:60]}...")
-                self.voice_manager.voice_manager.speak(foreign_part, language=tts_lang, use_polly=True)
+                print(f"📢 [Mode 2] Đọc {quiz_lang} (gTTS): {foreign_part[:60]}...")
+                self.voice_manager.voice_manager.speak_google_tts(foreign_part, language=tts_lang)
                 time.sleep(0.5)
                 
                 # Đọc câu hỏi tiếng Việt
@@ -1171,7 +1171,7 @@ class LanguageQuizGUI:
                     vn_question = "dịch sang tiếng Việt là gì?"
                 
                 print(f"📢 [Mode 2] Đọc câu hỏi VN: {vn_question}...")
-                self.voice_manager.voice_manager.speak(vn_question, language="vi", use_polly=False)
+                self.voice_manager.voice_manager.speak_google_tts(vn_question, language="vi")
                 time.sleep(0.3)
             
             # Bỏ đếm ngược - Đọc xong câu hỏi → có thể trả lời ngay
@@ -1322,7 +1322,7 @@ class LanguageQuizGUI:
                 
                 # Phát TTS trong thread riêng, tự đóng popup khi xong
                 def play_tts_async():
-                    self.voice_manager.voice_manager.speak("Đúng!", language="vi", use_polly=False)
+                    self.voice_manager.voice_manager.speak_google_tts("Đúng!", language="vi")
                     # Đóng popup sau khi TTS xong
                     time.sleep(0.3)
                     if popup_ref[0] and self.app_running:
@@ -1371,8 +1371,8 @@ class LanguageQuizGUI:
                         time.sleep(0.5)
                     else:
                         # Chế độ bình thường: phát TTS
-                        self.voice_manager.voice_manager.speak(feedback_text, language="vi", use_polly=False)
-                        self.voice_manager.voice_manager.speak(correct_answer, language=answer_lang, use_polly=use_polly)
+                        self.voice_manager.voice_manager.speak_google_tts(feedback_text, language="vi")
+                        self.voice_manager.voice_manager.speak_google_tts(correct_answer, language=answer_lang)
                         time.sleep(0.5)
                     
                     # Đóng popup
