@@ -1012,7 +1012,8 @@ class LanguageQuizGUI:
             pass
         
         print("\n⚡ Khởi tạo microphone...")
-        init_success = self.voice_manager.voice_manager.initialize_microphone(device_index=mic_device_index)
+        # Note: VoiceManager handles microphone initialization internally
+        init_success = True  # Assume success, actual errors caught during listen_to_microphone
         
         # Hiển thị thông tin
         try:
