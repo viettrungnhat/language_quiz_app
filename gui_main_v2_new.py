@@ -1220,8 +1220,7 @@ class LanguageQuizGUI:
             
             user_answer = self.voice_manager.voice_manager.listen_to_microphone(
                 timeout=15, 
-                language=language_stt,
-                device_index=mic_device_index
+                language=language_stt
             )
             
             # Reset mic status
