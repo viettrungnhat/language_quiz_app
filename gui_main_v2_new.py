@@ -944,10 +944,6 @@ class LanguageQuizGUI:
         self.user_settings["faster_feedback"] = self.faster_feedback_var.get()
         self._save_settings()
         
-        # Thiết lập giọng đọc cho voice manager
-        self.voice_manager.set_voice_preference('en', self.en_voice_var.get())
-        self.voice_manager.set_voice_preference('ja', self.ja_voice_var.get())
-        
         self.data = self._read_excel_data(self.sheet_combo.get())
         if not self.data:
             return
@@ -1099,8 +1095,7 @@ class LanguageQuizGUI:
                 print("⏹️ Quiz đã dừng, bỏ qua câu hỏi này")
                 return
             # Đặt lại voice preference mỗi lần câu hỏi (phòng reset)
-            self.voice_manager.set_voice_preference('en', self.en_voice_var.get())
-            self.voice_manager.set_voice_preference('ja', self.ja_voice_var.get())
+            # Voice preferences saved in user_settings
             
             # Detect ngôn ngữ test hiện tại để ưu tiên STT
             language_stt = self._get_stt_language()
