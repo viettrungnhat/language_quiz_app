@@ -1276,7 +1276,7 @@ class LanguageQuizGUI:
                 else:  # vietnamese
                     correct_answer = question.get("example_vi")  # Dịch tiếng Việt
             
-            is_correct, similarity, _ = self.voice_manager.voice_manager.compare_answers(user_answer, correct_answer)
+            is_correct, similarity, _ = self.voice_manager.compare_answers(user_answer, correct_answer)
             
             # Lưu kết quả
             score = min(10, int(similarity * 10)) if is_correct else max(0, int(similarity * 5))
