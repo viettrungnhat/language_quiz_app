@@ -78,7 +78,9 @@ class VoiceManager:
         # Speech Recognition
         self.recognizer = sr.Recognizer() if sr else None
         if self.recognizer:
-            self.recognizer.energy_threshold = 4000
+            # Giảm energy_threshold để nhạy hơn (mặc định 300, tăng = kém nhạy hơn)
+            self.recognizer.energy_threshold = 1000  # Giảm từ 4000 xuống 1000
+            self.recognizer.dynamic_energy_threshold = True  # Auto-adjust
         
         # Pygame cho audio playback
         self.pygame_available = pygame is not None
@@ -215,6 +217,7 @@ class VoiceManager:
         try:
             with sr.Microphone() as source:
                 print("🎤 Đang lắng nghe... Hãy nói câu trả lời của bạn")
+                print(f"⚙️ Energy threshold: {self.recognizer.energy_threshold}")
                 self.recognizer.adjust_for_ambient_noise(source, duration=0.5)
                 
                 # Ghi âm
@@ -226,9 +229,10 @@ class VoiceManager:
                 try:
                     # Thử dùng Google Speech Recognition
                     text = self.recognizer.recognize_google(audio, language=language)
+                    print(f"✅ Nhận dạng: {text}")
                     return text.strip()
                 except sr.UnknownValueError:
-                    print("❌ Không thể nhận dạng giọng nói. Vui lòng nói lại rõ ràng.")
+                    print(f"❌ Không thể nhận dạng: Không nghe được giọng nói rõ ràng")
                     return None
                 except sr.RequestError:
                     print("⚠️ Lỗi kết nối. Kiểm tra internet connection.")
