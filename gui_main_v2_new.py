@@ -455,6 +455,17 @@ class LanguageQuizGUI:
         self.voice_question_text.pack(fill=tk.BOTH, expand=True)
         self.voice_question_text.config(state=tk.DISABLED)
         
+        # 🎨 GIF Nhân vật động dưới câu hỏi
+        gif_frame = ttk.Frame(left_frame)
+        gif_frame.pack(fill=tk.X, pady=10)
+        self.voice_gif_label = tk.Label(gif_frame, bg="#f9f9f9")
+        self.voice_gif_label.pack()
+        
+        # Lưu frames + index animation
+        self.gif_frames = []
+        self.gif_frame_index = [0]
+        self.gif_animating = [False]
+        
         # RIGHT: Answer & Feedback
         right_frame = ttk.Frame(main_container)
         right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 0))
@@ -1205,7 +1216,9 @@ class LanguageQuizGUI:
                     vn_question = f"Câu '{meaning_part}' dịch sang {lang_name} là gì?"
                 
                 print(f"📢 [Mode 1] Đọc câu hỏi VN: {vn_question[:60]}...")
+                self._start_gif_animation()  # 🎨 Bắt đầu animate
                 self.voice_manager.voice_manager.speak_google_tts(vn_question, language="vi")
+                self._stop_gif_animation()  # 🎨 Dừng animate
                 time.sleep(0.3)
             
             # Mode 2: Đọc Foreign language (Polly) + Câu hỏi VN (gTTS) - User trả lời bằng Tiếng Việt
@@ -1247,7 +1260,9 @@ class LanguageQuizGUI:
                     vn_question = "dịch sang tiếng Việt là gì?"
                 
                 print(f"📢 [Mode 2] Đọc câu hỏi VN: {vn_question}...")
+                self._start_gif_animation()  # 🎨 Bắt đầu animate
                 self.voice_manager.voice_manager.speak_google_tts(vn_question, language="vi")
+                self._stop_gif_animation()  # 🎨 Dừng animate
                 time.sleep(0.3)
             
             # Bỏ đếm ngược - Đọc xong câu hỏi → có thể trả lời ngay
@@ -1731,6 +1746,60 @@ class LanguageQuizGUI:
         except Exception as e:
             self.test_mic_label.config(text=f"❌ Lỗi: {e}", foreground="red")
             print(f"❌ Test mic error: {e}")
+    
+    # ===== GIF ANIMATION =====
+    
+    def _load_gif_frames(self):
+        """Load GIF frames một lần duy nhất"""
+        if self.gif_frames:
+            return  # Đã load rồi
+        
+        try:
+            from PIL import Image, ImageTk
+            gif_path = Path(__file__).parent / "anh1.gif"
+            
+            if not gif_path.exists():
+                return
+            
+            # Load GIF
+            gif_image = Image.open(gif_path)
+            
+            # Extract all frames
+            for frame_idx in range(gif_image.n_frames):
+                gif_image.seek(frame_idx)
+                frame = gif_image.convert("RGBA").copy()
+                frame.thumbnail((150, 120), Image.Resampling.LANCZOS)
+                photo = ImageTk.PhotoImage(frame)
+                self.gif_frames.append(photo)
+        except Exception as e:
+            print(f"⚠️ Lỗi load GIF: {e}")
+    
+    def _animate_gif_question(self):
+        """Animate GIF khi đang đọc câu hỏi"""
+        if not self.gif_frames or not self.gif_animating[0]:
+            return
+        
+        try:
+            self.voice_gif_label.config(image=self.gif_frames[self.gif_frame_index[0]])
+            self.gif_frame_index[0] = (self.gif_frame_index[0] + 1) % len(self.gif_frames)
+            
+            # Update mỗi 100ms
+            if self.gif_animating[0]:
+                self.root.after(100, self._animate_gif_question)
+        except Exception as e:
+            print(f"⚠️ Lỗi animate GIF: {e}")
+    
+    def _start_gif_animation(self):
+        """Bắt đầu animate GIF"""
+        self._load_gif_frames()
+        if self.gif_frames:
+            self.gif_animating[0] = True
+            self.gif_frame_index[0] = 0
+            self._animate_gif_question()
+    
+    def _stop_gif_animation(self):
+        """Dừng animate GIF"""
+        self.gif_animating[0] = False
     
     # ===== HELPER METHODS =====
     
