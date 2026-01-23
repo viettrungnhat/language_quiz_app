@@ -1159,7 +1159,9 @@ class LanguageQuizGUI:
                 
                 # Đọc từ/câu tiếng nước ngoài
                 # Dùng Polly cho Anh/Trung/Nhật, gTTS cho Việt
-                if quiz_lang.lower() in ["en", "zh", "ja"]:
+                use_polly = quiz_lang in ["English", "Chinese", "Japanese"]
+                
+                if use_polly:
                     print(f"📢 [Mode 2] Đọc {quiz_lang} (Polly): {foreign_part[:60]}...")
                     self.voice_manager.voice_manager.speak_with_polly(foreign_part, language=tts_lang)
                 else:
