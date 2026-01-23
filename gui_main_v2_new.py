@@ -1158,8 +1158,13 @@ class LanguageQuizGUI:
                 tts_lang = lang_map.get(quiz_lang, "en")
                 
                 # Đọc từ/câu tiếng nước ngoài
-                print(f"📢 [Mode 2] Đọc {quiz_lang} (gTTS): {foreign_part[:60]}...")
-                self.voice_manager.voice_manager.speak_google_tts(foreign_part, language=tts_lang)
+                # Dùng Polly cho Anh/Trung/Nhật, gTTS cho Việt
+                if quiz_lang.lower() in ["en", "zh", "ja"]:
+                    print(f"📢 [Mode 2] Đọc {quiz_lang} (Polly): {foreign_part[:60]}...")
+                    self.voice_manager.voice_manager.speak_with_polly(foreign_part, language=tts_lang)
+                else:
+                    print(f"📢 [Mode 2] Đọc {quiz_lang} (gTTS): {foreign_part[:60]}...")
+                    self.voice_manager.voice_manager.speak_google_tts(foreign_part, language=tts_lang)
                 time.sleep(0.5)
                 
                 # Đọc câu hỏi tiếng Việt
@@ -1372,7 +1377,12 @@ class LanguageQuizGUI:
                     else:
                         # Chế độ bình thường: phát TTS
                         self.voice_manager.voice_manager.speak_google_tts(feedback_text, language="vi")
-                        self.voice_manager.voice_manager.speak_google_tts(correct_answer, language=answer_lang)
+                        
+                        # Dùng Polly cho Anh/Trung/Nhật, gTTS cho Việt
+                        if answer_lang in ["en", "zh", "ja"]:
+                            self.voice_manager.voice_manager.speak_with_polly(correct_answer, language=answer_lang)
+                        else:
+                            self.voice_manager.voice_manager.speak_google_tts(correct_answer, language=answer_lang)
                         time.sleep(0.5)
                     
                     # Đóng popup

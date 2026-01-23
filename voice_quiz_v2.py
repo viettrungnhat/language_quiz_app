@@ -1,16 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Voice Quiz Module v2.0 - Improved with Google TTS + Whisper
-Sử dụng Google Text-to-Speech (Online) + Whisper (OpenAI)
+Voice Quiz Module v2.0 - Improved with Google TTS + AWS Polly + Whisper
+Sử dụng Google Text-to-Speech (Online) + AWS Polly (cho Anh/Trung/Nhật) + Whisper (OpenAI)
 """
 
 import os
 import io
+import tempfile
 from pathlib import Path
 from typing import Tuple, Optional
 from difflib import SequenceMatcher
 import threading
+from dotenv import load_dotenv
+
+# Load environment variables từ .env file
+env_path = Path(__file__).parent / ".env"
+load_dotenv(env_path)
 
 try:
     from gtts import gTTS
@@ -32,13 +38,42 @@ try:
 except ImportError:
     pygame = None
 
+try:
+    import boto3
+except ImportError:
+    boto3 = None
+
 
 class VoiceManager:
-    """Quản lý text-to-speech và speech-to-text (v2.0)"""
+    """Quản lý text-to-speech và speech-to-text (v2.0) - gTTS + AWS Polly"""
     
     def __init__(self):
         # Google TTS
         self.gtts_available = gTTS is not None
+        
+        # AWS Polly
+        self.polly_available = boto3 is not None
+        self.polly_client = None
+        if self.polly_available:
+            try:
+                aws_key = os.getenv("AWS_ACCESS_KEY_ID")
+                aws_secret = os.getenv("AWS_SECRET_ACCESS_KEY")
+                aws_region = os.getenv("AWS_REGION", "ap-southeast-2")
+                
+                if aws_key and aws_secret:
+                    self.polly_client = boto3.client(
+                        'polly',
+                        region_name=aws_region,
+                        aws_access_key_id=aws_key,
+                        aws_secret_access_key=aws_secret
+                    )
+                    print("✅ AWS Polly initialized successfully")
+                else:
+                    print("⚠️ AWS credentials not found in .env - Polly disabled")
+                    self.polly_available = False
+            except Exception as e:
+                print(f"⚠️ AWS Polly init error: {e}")
+                self.polly_available = False
         
         # Speech Recognition
         self.recognizer = sr.Recognizer() if sr else None
@@ -98,6 +133,54 @@ class VoiceManager:
         except Exception as e:
             print(f"❌ Google TTS error: {e}")
             return False
+    
+    def speak_with_polly(self, text: str, language: str = "en", voice: str = None) -> bool:
+        """
+        Phát âm thanh từ văn bản dùng AWS Polly
+        language: "en", "zh", "ja"
+        voice: Tên giọng (nếu None sẽ dùng default)
+        Returns: True nếu thành công
+        """
+        if not self.polly_available or not self.polly_client:
+            print("❌ AWS Polly not available. Fallback to gTTS...")
+            return self.speak_google_tts(text, language)
+        
+        try:
+            # Voice mapping
+            voice_map = {
+                "en": "Joanna",       # Female English
+                "zh": "Zhiyu",        # Male Mandarin
+                "ja": "Mizuki"        # Female Japanese
+            }
+            
+            polly_lang = language.lower()
+            polly_voice = voice or voice_map.get(polly_lang, "Joanna")
+            
+            # Gọi AWS Polly
+            response = self.polly_client.synthesize_speech(
+                Text=text,
+                OutputFormat='mp3',
+                VoiceId=polly_voice,
+                Engine='neural'  # Neural engine cho chất lượng tốt hơn
+            )
+            
+            # Phát audio
+            audio_stream = response['AudioStream'].read()
+            audio_fp = io.BytesIO(audio_stream)
+            
+            if self.pygame_available:
+                self._play_audio_pygame(audio_fp)
+            else:
+                # Lưu file tạm
+                temp_file = Path(tempfile.gettempdir()) / "polly_temp.mp3"
+                with open(temp_file, 'wb') as f:
+                    f.write(audio_stream)
+                self._play_audio_file(str(temp_file))
+            
+            return True
+        except Exception as e:
+            print(f"❌ AWS Polly error: {e}. Fallback to gTTS...")
+            return self.speak_google_tts(text, language)
     
     def _play_audio_pygame(self, audio_fp):
         """Phát audio bằng pygame"""
