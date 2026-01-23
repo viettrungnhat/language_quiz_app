@@ -48,9 +48,15 @@ class QuizEngine:
         Kiểm tra câu trả lời
         Trả về: (is_correct, feedback, score)
         """
+        print(f"\n🔍 QUIZ_ENGINE CHECK_ANSWER:")
+        print(f"   User: '{user_answer}'")
+        print(f"   Correct: '{correct_answer}'")
+        
         score, feedback = self.scorer.calculate_score(
             user_answer, correct_answer, attempt
         )
+        
+        print(f"   Score: {score}, Feedback: {feedback}")
         
         is_correct = score >= 5  # Coi >= 5 là đúng
         return is_correct, feedback, score

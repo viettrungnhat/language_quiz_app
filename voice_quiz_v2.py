@@ -39,6 +39,11 @@ except ImportError:
     pygame = None
 
 try:
+    import winsound
+except ImportError:
+    winsound = None
+
+try:
     import boto3
 except ImportError:
     boto3 = None
@@ -78,9 +83,13 @@ class VoiceManager:
         # Speech Recognition
         self.recognizer = sr.Recognizer() if sr else None
         if self.recognizer:
+            # ⚠️ QUAN TRỌNG: Cố định energy_threshold (không auto-adjust)
             # Giảm energy_threshold để nhạy hơn (mặc định 300, tăng = kém nhạy hơn)
-            self.recognizer.energy_threshold = 1000  # Giảm từ 4000 xuống 1000
-            self.recognizer.dynamic_energy_threshold = True  # Auto-adjust
+            self.recognizer.energy_threshold = 5  # Rất thấp = cực kỳ nhạy, sẽ nhận từ tiếng lẹo
+            self.recognizer.dynamic_energy_threshold = False  # ❌ KHÔNG auto-adjust
+            print(f"✅ STT Energy Threshold: {self.recognizer.energy_threshold} (ultra-sensitive)")
+
+
         
         # Pygame cho audio playback
         self.pygame_available = pygame is not None
@@ -90,6 +99,21 @@ class VoiceManager:
             except Exception as e:
                 print(f"⚠️ Pygame init error: {e}")
                 self.pygame_available = False
+    
+    @staticmethod
+    def list_microphones():
+        """List all available microphones"""
+        try:
+            if not sr:
+                return []
+            
+            mics = []
+            for i, mic_name in enumerate(sr.Microphone.list_microphone_names()):
+                mics.append((i, mic_name))
+            return mics
+        except Exception as e:
+            print(f"⚠️ Error listing microphones: {e}")
+            return [(None, "(Mặc định)")]
     
     def speak_google_tts(self, text: str, language: str = "en") -> bool:
         """
@@ -158,12 +182,17 @@ class VoiceManager:
             polly_lang = language.lower()
             polly_voice = voice or voice_map.get(polly_lang, "Joanna")
             
+            # 🔊 Wrap text với SSML để tăng volume
+            ssml_text = f'<speak><prosody volume="loud">{text}</prosody></speak>'
+            
             # Gọi AWS Polly
             response = self.polly_client.synthesize_speech(
-                Text=text,
+                Text=ssml_text,
                 OutputFormat='mp3',
                 VoiceId=polly_voice,
-                Engine='neural'  # Neural engine cho chất lượng tốt hơn
+                Engine='standard',  # ⚡ Standard engine nhanh hơn neural
+                TextType='ssml'  # ✅ Báo là SSML
+
             )
             
             # Phát audio
@@ -171,7 +200,7 @@ class VoiceManager:
             audio_fp = io.BytesIO(audio_stream)
             
             if self.pygame_available:
-                self._play_audio_pygame(audio_fp)
+                self._play_audio_pygame(audio_fp, language=language)
             else:
                 # Lưu file tạm
                 temp_file = Path(tempfile.gettempdir()) / "polly_temp.mp3"
@@ -184,10 +213,22 @@ class VoiceManager:
             print(f"❌ AWS Polly error: {e}. Fallback to gTTS...")
             return self.speak_google_tts(text, language)
     
-    def _play_audio_pygame(self, audio_fp):
-        """Phát audio bằng pygame"""
+    def _play_audio_pygame(self, audio_fp, language="en"):
+        """Phát audio bằng pygame với volume khác nhau per language"""
         try:
+            # Volume mapping: Anh/Trung/Nhật max, Việt giảm xuống
+            volume_map = {
+                "en": 1.0,      # English: max
+                "zh": 1.0,      # Chinese: max
+                "ja": 1.0,      # Japanese: max
+                "vi": 0.5,      # Vietnamese: 50% (hạ xuống)
+            }
+            
+            lang_key = language.lower()[:2]  # Lấy 2 ký tự đầu (en, zh, ja, vi)
+            volume = volume_map.get(lang_key, 1.0)
+            
             pygame.mixer.music.load(audio_fp)
+            pygame.mixer.music.set_volume(volume)
             pygame.mixer.music.play()
             
             # Chờ phát xong
@@ -217,11 +258,24 @@ class VoiceManager:
         try:
             with sr.Microphone() as source:
                 print("🎤 Đang lắng nghe... Hãy nói câu trả lời của bạn")
-                print(f"⚙️ Energy threshold: {self.recognizer.energy_threshold}")
-                self.recognizer.adjust_for_ambient_noise(source, duration=0.5)
+                
+                # 🔊 Phát beep báo hiệu bắt đầu
+                if winsound:
+                    winsound.Beep(1000, 200)  # 1000 Hz, 200ms
+                
+                # ⚠️ KHÔNG dùng adjust_for_ambient_noise - nó sẽ ghi đè energy_threshold!
+                # Chỉ cần pause_threshold để cho phép giọng nói tự nhiên
+                self.recognizer.pause_threshold = 0.5
+                self.recognizer.phrase_time_limit = 3  # ⏱️ Nghe tối đa 3s một câu
+                
+                print(f"⚙️ Energy threshold: {self.recognizer.energy_threshold} (fixed)")
                 
                 # Ghi âm
-                audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=15)
+                audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=3)
+                
+                # 🔊 Phát beep báo hiệu kết thúc
+                if winsound:
+                    winsound.Beep(800, 150)  # 800 Hz, 150ms
                 
                 # Nhận dạng
                 print("🔄 Đang xử lý giọng nói...")
@@ -283,33 +337,53 @@ class VoiceQuizManager:
     def compare_answers(self, user_answer: str, correct_answer: str) -> Tuple[bool, float, str]:
         """
         So sánh câu trả lời của người dùng với câu trả lời đúng
+        Dùng Scorer từ app cho consistent comparison
         Returns: (is_correct, similarity_score, feedback)
         """
         if not user_answer:
             return False, 0.0, "❌ Không có câu trả lời"
         
-        user_clean = user_answer.lower().strip()
-        correct_clean = correct_answer.lower().strip()
-        
-        # Tính độ tương đồng
-        matcher = SequenceMatcher(None, user_clean, correct_clean)
-        similarity = matcher.ratio()
-        
-        # Kiểm tra từng từ
-        user_words = set(user_clean.split())
-        correct_words = set(correct_clean.split())
-        
-        if user_clean == correct_clean:
-            return True, 1.0, "✅ Chính xác 100%!"
-        
-        elif similarity >= 0.8:
-            common_words = len(user_words & correct_words)
-            total_words = len(correct_words)
-            if common_words / total_words >= 0.7:
-                return True, similarity, f"✅ Tốt! Độ chính xác: {similarity*100:.0f}%"
-        
-        # Sai
-        return False, similarity, f"❌ Sai. Trả lời đúng là: {correct_answer}"
+        # Import scorer để dùng logic consistent
+        try:
+            from scorer import Scorer
+            scorer = Scorer()
+            score, feedback = scorer.calculate_score(user_answer, correct_answer, attempt=1)
+            
+            # Convert score to similarity (10 = 1.0, 0 = 0.0)
+            similarity = score / 10.0
+            is_correct = score >= 5  # Coi >= 5 là đúng
+            
+            return is_correct, similarity, feedback
+        except ImportError:
+            # Fallback nếu không có scorer
+            print("⚠️ Scorer not found, using fallback comparison")
+            
+            import re
+            import unicodedata
+            
+            def normalize_text(text):
+                # Loại bỏ dấu thanh Unicode
+                nfd_text = unicodedata.normalize('NFD', text)
+                text_clean = ''.join(c for c in nfd_text if unicodedata.category(c) != 'Mn')
+                # Loại bỏ dấu câu (,;:.!?)
+                text_clean = re.sub(r'[^\w\s]', '', text_clean)
+                # Loại bỏ khoảng trắng dư thừa
+                return re.sub(r'\s+', ' ', text_clean.strip().lower())
+            
+            user_normalized = normalize_text(user_answer)
+            correct_normalized = normalize_text(correct_answer)
+            
+            if user_normalized == correct_normalized:
+                return True, 1.0, "✅ Hoàn hảo!"
+            
+            # Fallback simple check
+            matcher = SequenceMatcher(None, user_normalized, correct_normalized)
+            similarity = matcher.ratio()
+            
+            if similarity >= 0.95:
+                return True, similarity, f"✔️ Gần đúng ({similarity*100:.0f}%)"
+            
+            return False, similarity, f"❌ Sai. Trả lời đúng là: {correct_answer}"
 
 
 # Test

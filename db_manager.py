@@ -73,8 +73,18 @@ class StudyHistoryDB:
     
     def close(self):
         """Close database connection"""
-        if self.conn:
-            self.conn.close()
+        try:
+            if self.conn:
+                self.conn.close()
+        except Exception as e:
+            print(f"⚠️ Error closing database: {e}")
+    
+    def __del__(self):
+        """Destructor - safe close"""
+        try:
+            self.close()
+        except:
+            pass  # Ignore errors during cleanup
     
     def add_or_update_word(self, word: str, language: str, level: str = "A1") -> int:
         """Add or get word ID"""
@@ -283,9 +293,13 @@ class StudyHistoryDB:
         self.conn.commit()
         return cursor.rowcount
     
-    def __del__(self):
-        """Ensure database connection is closed"""
-        self.close()
+    def clear_old_logs(self, days: int = 90):
+        """Delete study logs older than specified days"""
+        cursor = self.conn.cursor()
+        cutoff_date = datetime.now() - timedelta(days=days)
+        cursor.execute("DELETE FROM study_log WHERE timestamp < ?", (cutoff_date,))
+        self.conn.commit()
+        return cursor.rowcount
 
 
 if __name__ == "__main__":

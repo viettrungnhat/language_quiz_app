@@ -212,6 +212,7 @@ class LanguageQuizGUI:
             self.en_voice_var.set(self.user_settings.get("en_voice", "female"))
             self.ja_voice_var.set(self.user_settings.get("ja_voice", "female"))
             self.faster_feedback_var.set(self.user_settings.get("faster_feedback", False))
+            self.quiz_mode_var.set(self.user_settings.get("quiz_mode", "normal"))
             
         except Exception as e:
             print(f"⚠️ Không load được session trước: {e}")
@@ -250,8 +251,8 @@ class LanguageQuizGUI:
         # Load microphones
         self.mic_device_indices = []
         try:
-            from voice_quiz_v3 import VoiceManagerV3
-            mics = VoiceManagerV3.list_microphones()
+            from voice_quiz_v2 import VoiceManager
+            mics = VoiceManager.list_microphones()
             mic_names = []
             for idx, name in mics:
                 self.mic_device_indices.append(idx)
@@ -340,6 +341,16 @@ class LanguageQuizGUI:
         self.faster_feedback_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(quiz_frame, text="⚡ Phản hồi nhanh (chỉ text, bỏ TTS)", 
                        variable=self.faster_feedback_var).pack(anchor=tk.W, pady=5)
+        
+        ttk.Separator(quiz_frame, orient='horizontal').pack(fill=tk.X, pady=8)
+        
+        # Practice Mode Selection
+        ttk.Label(quiz_frame, text="📚 Chế độ Quiz:", font=("Segoe UI", 9, "bold")).pack(anchor=tk.W)
+        self.quiz_mode_var = tk.StringVar(value="normal")
+        ttk.Radiobutton(quiz_frame, text="📖 Normal - Toàn bộ từ", 
+                       variable=self.quiz_mode_var, value="normal").pack(anchor=tk.W, pady=2)
+        ttk.Radiobutton(quiz_frame, text="🎯 Practice - Ôn tập từ yếu (sai từ trước)", 
+                       variable=self.quiz_mode_var, value="practice").pack(anchor=tk.W, pady=2)
         
         # RIGHT COLUMN
         right_col = ttk.Frame(main_container)
@@ -942,49 +953,90 @@ class LanguageQuizGUI:
         self.user_settings["en_voice"] = self.en_voice_var.get()
         self.user_settings["ja_voice"] = self.ja_voice_var.get()
         self.user_settings["faster_feedback"] = self.faster_feedback_var.get()
+        self.user_settings["quiz_mode"] = self.quiz_mode_var.get()
         self._save_settings()
         
-        self.data = self._read_excel_data(self.sheet_combo.get())
-        if not self.data:
-            return
+        # 🎯 Check if Practice Mode
+        quiz_mode = self.quiz_mode_var.get()
+        
+        if quiz_mode == "practice":
+            # Practice Mode: Load weak words from database
+            try:
+                language = self._detect_language_from_file(Path(self.selected_file).name)
+                weak_words = self.study_db.get_weak_words(language)
+                
+                if not weak_words:
+                    messagebox.showinfo("Thông báo", f"✅ Tuyệt vời!\n\nKhông có từ nào cần ôn tập trong {language}.\n\nTất cả từ đều đã học tốt! 🎉")
+                    return
+                
+                # Convert weak words to quiz format
+                selected_data = []
+                for weak_word_dict in weak_words:
+                    # Format: {"word": word_text, "meaning": meaning, "language": lang, "wrong_count": X, "last_reviewed": timestamp}
+                    selected_data.append({
+                        "word": weak_word_dict["word"],
+                        "meaning": f"[{weak_word_dict['wrong_count']}x sai] {weak_word_dict['word']}",  # Show mistake count
+                        "language": weak_word_dict["language"],
+                        "wrong_count": weak_word_dict["wrong_count"],
+                        "last_reviewed": weak_word_dict["last_reviewed"],
+                        "word_id": weak_word_dict["word_id"]
+                    })
+                
+                num_questions = len(selected_data)
+                mode_text = f"🎯 Ôn tập từ yếu: {num_questions} từ cần học lại"
+                
+            except Exception as e:
+                messagebox.showerror("Lỗi", f"❌ Lỗi khi tải từ yếu:\n{e}")
+                return
+        else:
+            # Normal Mode: Load from file
+            self.data = self._read_excel_data(self.sheet_combo.get())
+            if not self.data:
+                return
+            
+            # Xử lý range selection
+            start_idx = self.start_question_var.get() - 1  # Convert to 0-based
+            end_idx = self.end_question_var.get()
+            
+            # Validate range
+            if start_idx < 0:
+                start_idx = 0
+            if end_idx > len(self.data):
+                end_idx = len(self.data)
+            if start_idx >= end_idx:
+                messagebox.showerror("Lỗi", f"❌ Khoảng không hợp lệ!\nCâu bắt đầu phải < câu kết thúc.\n\nTổng số câu: {len(self.data)}")
+                return
+            
+            # Slice data theo range
+            selected_data = self.data[start_idx:end_idx]
+            
+            # Số câu thực tế
+            num_questions_requested = self.num_questions_var.get()
+            num_questions = min(num_questions_requested, len(selected_data))
+            
+            if self.shuffle_var.get():
+                mode_text = f"🔀 Trộn {num_questions} câu"
+            else:
+                mode_text = f"📋 Theo thứ tự: câu {start_idx+1}-{start_idx+num_questions}"
         
         self.quiz_type_str = self.quiz_type_var.get()
-        
-        # Xử lý range selection
-        start_idx = self.start_question_var.get() - 1  # Convert to 0-based
-        end_idx = self.end_question_var.get()
-        
-        # Validate range
-        if start_idx < 0:
-            start_idx = 0
-        if end_idx > len(self.data):
-            end_idx = len(self.data)
-        if start_idx >= end_idx:
-            messagebox.showerror("Lỗi", f"❌ Khoảng không hợp lệ!\nCâu bắt đầu phải < câu kết thúc.\n\nTổng số câu: {len(self.data)}")
-            return
-        
-        # Slice data theo range
-        selected_data = self.data[start_idx:end_idx]
-        
-        # Số câu thực tế
-        num_questions_requested = self.num_questions_var.get()
-        num_questions = min(num_questions_requested, len(selected_data))
-        
         self.quiz_engine = QuizEngine(selected_data, language="English")
         
-        # Shuffle hoặc theo thứ tự
-        if self.shuffle_var.get():
-            self.quiz_engine.shuffle_questions(num_questions)
-            mode_text = f"🔀 Trộn {num_questions} câu"
+        # Shuffle hoặc theo thứ tự (chỉ cho Normal mode)
+        if quiz_mode == "normal":
+            if self.shuffle_var.get():
+                self.quiz_engine.shuffle_questions(num_questions)
+            else:
+                self.quiz_engine.questions = selected_data[:num_questions]
         else:
-            # Không shuffle - lấy theo thứ tự
-            self.quiz_engine.questions = selected_data[:num_questions]
-            mode_text = f"📋 Theo thứ tự: câu {start_idx+1}-{start_idx+num_questions}"
+            # Practice mode: không shuffle, toàn bộ weak words
+            self.quiz_engine.questions = selected_data
         
         self.quiz_engine.quiz_type = self.quiz_type_str
         
         self.current_question_idx = 0
         self.quiz_results = []
+        self.quiz_mode = quiz_mode  # Store mode for use in quiz
         
         # 🚀 Dừng quiz cũ nếu đang chạy
         self.quiz_active = False
@@ -1068,6 +1120,16 @@ class LanguageQuizGUI:
         self.voice_question_text.config(font=font)
         
         self.voice_question_text.insert(tk.END, f"❓ {question_text}")
+        
+        # 🎯 In thêm thông tin từ yếu (nếu là Practice Mode)
+        if hasattr(self, 'quiz_mode') and self.quiz_mode == "practice":
+            wrong_count = question.get('wrong_count', 0)
+            last_reviewed = question.get('last_reviewed', '')
+            practice_info = f"\n\n📊 Lần sai: {wrong_count}"
+            if last_reviewed:
+                practice_info += f" | Lần cuối: {last_reviewed}"
+            self.voice_question_text.insert(tk.END, practice_info)
+        
         self.voice_question_text.config(state=tk.DISABLED)
         
         current = self.current_question_idx + 1
@@ -1477,7 +1539,7 @@ class LanguageQuizGUI:
         """Hiển thị popup (TTS thread sẽ tự đóng khi phát xong)"""
         popup = tk.Toplevel(self.root)
         popup.title(title)
-        popup.geometry("400x220")
+        popup.geometry("550x380")
         popup.resizable(False, False)
         
         # 🎨 Set icon cho popup
@@ -1489,33 +1551,52 @@ class LanguageQuizGUI:
         
         # Center popup
         popup.update_idletasks()
-        x = (popup.winfo_screenwidth() // 2) - (400 // 2)
-        y = (popup.winfo_screenheight() // 2) - (220 // 2)
-        popup.geometry(f"400x220+{x}+{y}")
+        x = (popup.winfo_screenwidth() // 2) - (550 // 2)
+        y = (popup.winfo_screenheight() // 2) - (380 // 2)
+        popup.geometry(f"550x380+{x}+{y}")
+        
+        # Xác định màu sắc dựa trên title
+        if "Chính Xác" in title or "Đúng" in title:
+            bg_color = "#d4edda"  # Xanh lá
+            text_color = "#155724"  # Xanh đậm
+            title_color = "#28a745"  # Xanh lá đậm
+        else:
+            bg_color = "#f8d7da"  # Đỏ nhạt
+            text_color = "#721c24"  # Đỏ đậm
+            title_color = "#dc3545"  # Đỏ
+        
+        popup.config(bg=bg_color)
         
         # Frame chính
-        main_frame = ttk.Frame(popup, padding=20)
+        main_frame = tk.Frame(popup, bg=bg_color, padx=20, pady=20)
         main_frame.pack(fill=tk.BOTH, expand=True)
         
-        # Icon và message
-        msg_label = tk.Label(main_frame, text=message, font=("Arial", 11), 
-                            justify=tk.LEFT, wraplength=350)
+        # Title
+        title_label = tk.Label(main_frame, text=title, font=("Arial", 16, "bold"),
+                              fg=title_color, bg=bg_color)
+        title_label.pack(pady=(0, 15))
+        
+        # Message
+        msg_label = tk.Label(main_frame, text=message, font=("Arial", 13, "bold"),
+                            fg=text_color, justify=tk.LEFT, wraplength=480, bg=bg_color)
         msg_label.pack(pady=20)
         
         # Hiển thị trạng thái
-        status_label = ttk.Label(main_frame, text="🔊 Đang phát giọng nói...", 
-                               font=("Arial", 9), foreground="blue")
+        status_label = tk.Label(main_frame, text="🔊 Đang phát giọng nói...",
+                               font=("Arial", 10), fg="blue", bg=bg_color)
         status_label.pack(pady=10)
         
-        # Button đóng (phòng user muốn đóng sớm)
-        btn_frame = ttk.Frame(main_frame)
-        btn_frame.pack(pady=10)
-        ttk.Button(btn_frame, text="OK", command=popup.destroy, width=15).pack()
+        # Button đóng
+        btn_frame = tk.Frame(main_frame, bg=bg_color)
+        btn_frame.pack(pady=15)
+        
+        close_btn = tk.Button(btn_frame, text="OK", command=popup.destroy,
+                             font=("Arial", 11, "bold"), width=15,
+                             bg=title_color, fg="white", cursor="hand2")
+        close_btn.pack()
         
         popup.focus_force()
         return popup
-        
-        popup.after(1000, countdown)
         popup.focus_force()
         
         # Đợi popup đóng
@@ -1865,6 +1946,21 @@ class LanguageQuizGUI:
                             # Log the answer
                             is_correct = result.get("score", 0) > 0
                             self.study_db.log_answer(word_id, is_correct, file_name_only, sheet_name)
+                            
+                            # 🎯 If in Practice Mode and correct: clear the next_review_date
+                            if hasattr(self, 'quiz_mode') and self.quiz_mode == "practice" and is_correct:
+                                try:
+                                    from datetime import datetime
+                                    # Mark as completed (no next review needed)
+                                    cursor = self.study_db.conn.cursor()
+                                    cursor.execute(
+                                        "UPDATE words SET next_review_date = NULL WHERE word_id = ?",
+                                        (word_id,)
+                                    )
+                                    self.study_db.conn.commit()
+                                    print(f"✅ Từ '{word}' đã hoàn thành - xóa next_review_date")
+                                except Exception as e:
+                                    print(f"⚠️ Lỗi khi cập nhật review date: {e}")
                     
                     print(f"✅ Đã log {len(self.quiz_results)} answers to database")
             except Exception as db_err:

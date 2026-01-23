@@ -21,51 +21,75 @@ class Scorer:
         - Lần 3, bất kỳ: 3-4 điểm
         - Sai hoàn toàn: 0 điểm
         """
+        import re
+        import unicodedata
         
-        user_answer = user_answer.strip().lower()
-        correct_answer = correct_answer.strip().lower()
+        # Normalize: loại bỏ dấu thanh tiếng Việt + dấu câu
+        def normalize_text(text):
+            # Loại bỏ dấu thanh Unicode
+            nfd_text = unicodedata.normalize('NFD', text)
+            text_clean = ''.join(c for c in nfd_text if unicodedata.category(c) != 'Mn')
+            # Loại bỏ dấu câu (,;:.!?)
+            text_clean = re.sub(r'[^\w\s]', '', text_clean)
+            # Loại bỏ khoảng trắng dư thừa
+            return re.sub(r'\s+', ' ', text_clean.strip().lower())
         
-        # Kiểm tra chính xác (loại bỏ khoảng trắng dư thừa)
-        if user_answer == correct_answer:
+        user_normalized = normalize_text(user_answer)
+        correct_normalized = normalize_text(correct_answer)
+        
+        # 🔍 DEBUG
+        print(f"📝 User input: '{user_answer}' → '{user_normalized}'")
+        print(f"✅ Correct: '{correct_answer}' → '{correct_normalized}'")
+        print(f"🔀 Match: {user_normalized == correct_normalized}")
+        
+        # Kiểm tra chính xác
+        if user_normalized == correct_normalized:
             if attempt == 1:
                 score = 10
-                feedback = "✓ Hoàn hảo!"
+                feedback = "✅ Hoàn hảo!"
             elif attempt == 2:
                 score = 7
-                feedback = "✓ Đúng, nhưng lần trước nên cảnh báo"
+                feedback = "✅ Đúng!"
             else:
                 score = 4
-                feedback = "✓ Đúng rồi (lần thứ 3)"
+                feedback = "✅ Đúng (lần thứ 3)"
         # Kiểm tra gần đúng (chứa từ khóa chính)
-        elif self._is_similar(user_answer, correct_answer):
+        elif self._is_similar(user_normalized, correct_normalized):
             if attempt == 1:
                 score = 8
-                feedback = "~ Gần đúng, xem lại lần nữa"
+                feedback = "✔️ Gần đúng"
             elif attempt == 2:
                 score = 5
-                feedback = "~ Gần đúng"
+                feedback = "✔️ Gần đúng"
             else:
                 score = 2
-                feedback = "~ Gần đúng (lần thứ 3)"
+                feedback = "✔️ Gần đúng (lần thứ 3)"
         else:
             score = 0
-            feedback = "✗ Sai rồi"
+            feedback = "❌ Sai rồi"
         
         return score, feedback
     
     def _is_similar(self, answer1, answer2):
-        """Kiểm tra hai câu trả lời có gần giống nhau không"""
-        # Loại bỏ khoảng trắng và dấu câu
-        import re
-        answer1 = re.sub(r'[^\w\s]', '', answer1).split()
-        answer2 = re.sub(r'[^\w\s]', '', answer2).split()
+        """
+        Kiểm tra hai câu trả lời có gần giống nhau không
+        Input đã được normalize từ calculate_score(), không cần normalize lại
+        Chỉ bảo "gần đúng" nếu chứa ≥95% từ khóa chính
+        """
+        # Input đã normalize: "yeu thich" (không dấu, không dấu câu)
+        words1 = set(answer1.split())
+        words2 = set(answer2.split())
         
-        # Nếu chứa ít nhất 70% từ giống nhau
-        if len(answer2) > 0:
-            common_words = len(set(answer1) & set(answer2))
-            similarity = common_words / len(answer2)
-            return similarity >= 0.7
-        return False
+        if len(words2) == 0 or len(words1) == 0:
+            return False
+        
+        # Kiểm tra % từ khóa chính có trong câu trả lời
+        common_words = len(words1 & words2)
+        similarity_correct = common_words / len(words2)  # % từ đúng có trong câu trả lời
+        
+        # Chỉ bảo gần đúng nếu có ít nhất 95% từ khóa chính
+        # (tức là chỉ khác/thiếu 1 chữ quan trọng, không phải khác dấu câu/khoảng trắng)
+        return similarity_correct >= 0.95
     
     def add_result(self, question_num, question_text, user_answer, correct_answer, score):
         """Thêm kết quả một câu"""
