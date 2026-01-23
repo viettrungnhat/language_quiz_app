@@ -1162,8 +1162,15 @@ class LanguageQuizGUI:
                 use_polly = quiz_lang in ["English", "Chinese", "Japanese"]
                 
                 if use_polly:
-                    print(f"📢 [Mode 2] Đọc {quiz_lang} (Polly): {foreign_part[:60]}...")
-                    self.voice_manager.voice_manager.speak_with_polly(foreign_part, language=tts_lang)
+                    # Lấy voice choice từ UI
+                    voice_choice = None
+                    if quiz_lang == "English":
+                        voice_choice = "Matthew" if self.en_voice_var.get() == "male" else "Joanna"
+                    elif quiz_lang == "Japanese":
+                        voice_choice = "Takumi" if self.ja_voice_var.get() == "male" else "Mizuki"
+                    
+                    print(f"📢 [Mode 2] Đọc {quiz_lang} (Polly - {voice_choice}): {foreign_part[:60]}...")
+                    self.voice_manager.voice_manager.speak_with_polly(foreign_part, language=tts_lang, voice=voice_choice)
                 else:
                     print(f"📢 [Mode 2] Đọc {quiz_lang} (gTTS): {foreign_part[:60]}...")
                     self.voice_manager.voice_manager.speak_google_tts(foreign_part, language=tts_lang)
@@ -1381,7 +1388,14 @@ class LanguageQuizGUI:
                         
                         # Dùng Polly cho Anh/Trung/Nhật, gTTS cho Việt
                         if answer_lang in ["en", "zh", "ja"]:
-                            self.voice_manager.voice_manager.speak_with_polly(correct_answer, language=answer_lang)
+                            # Lấy voice choice từ UI
+                            voice_choice = None
+                            if answer_lang == "en":
+                                voice_choice = "Matthew" if self.en_voice_var.get() == "male" else "Joanna"
+                            elif answer_lang == "ja":
+                                voice_choice = "Takumi" if self.ja_voice_var.get() == "male" else "Mizuki"
+                            
+                            self.voice_manager.voice_manager.speak_with_polly(correct_answer, language=answer_lang, voice=voice_choice)
                         else:
                             self.voice_manager.voice_manager.speak_google_tts(correct_answer, language=answer_lang)
                         time.sleep(0.5)
