@@ -17,6 +17,7 @@ from voice_quiz_v2 import VoiceQuizManager
 from db_manager import StudyHistoryDB
 from pathlib import Path
 import json
+import threading
 from threading import Thread, Lock
 import tkinter.font as tkFont
 import winsound  # Để phát beep sound
@@ -383,6 +384,20 @@ class LanguageQuizGUI:
         # Voice Settings - Di chuyển từ left column
         voice_frame = ttk.LabelFrame(right_col, text="🎙️ Giọng đọc & Tùy chọn", padding=10)
         voice_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # Ngôn ngữ Chatbot (hướng dẫn, phản hồi)
+        bot_lang_frame = ttk.Frame(voice_frame)
+        bot_lang_frame.pack(fill=tk.X, pady=(0, 8))
+        ttk.Label(bot_lang_frame, text="🤖 Chatbot:", font=("Segoe UI", 9, "bold"), width=10).pack(side=tk.LEFT)
+        self.bot_language_var = tk.StringVar(value="vi")
+        bot_lang_combo = ttk.Combobox(bot_lang_frame, textvariable=self.bot_language_var, 
+                                     values=["Tiếng Việt", "Tiếng Anh", "Tiếng Trung", "Tiếng Nhật"], 
+                                     state="readonly", width=15)
+        bot_lang_combo.pack(side=tk.LEFT, padx=3)
+        bot_lang_combo.current(0)  # Mặc định Tiếng Việt
+        ttk.Label(bot_lang_frame, text="(Hướng dẫn & phản hồi)", font=("Segoe UI", 8), foreground="gray").pack(side=tk.LEFT, padx=3)
+        
+        ttk.Separator(voice_frame, orient='horizontal').pack(fill=tk.X, pady=8)
         
         # English voice
         en_voice_frame = ttk.Frame(voice_frame)
@@ -1341,18 +1356,37 @@ class LanguageQuizGUI:
                 # Chỉ đọc hướng dẫn ở câu đầu tiên
                 if not self.instruction_shown:
                     quiz_lang = self._get_quiz_language_code()
-                    lang_name = "tiếng Anh" if quiz_lang == "English" else ("tiếng Trung" if quiz_lang == "Chinese" else "tiếng Nhật")
+                    bot_lang = self._get_bot_language_code()
                     
-                    if self.quiz_type_str == "meaning":
-                        instruction = f"Hãy dịch các từ sau sang {lang_name}"
-                    elif self.quiz_type_str == "example":
-                        instruction = f"Hãy dịch các câu sau sang {lang_name}"
-                    else:  # vietnamese
-                        instruction = f"Hãy dịch các câu sau sang {lang_name}"
+                    # ⚡ Dictionary các câu hướng dẫn đa ngôn ngữ
+                    instructions = {
+                        "vi": {
+                            "meaning": f"Hãy dịch các từ sau sang tiếng {quiz_lang}",
+                            "example": f"Hãy dịch các câu sau sang tiếng {quiz_lang}",
+                            "vietnamese": f"Hãy dịch các câu sau sang tiếng {quiz_lang}"
+                        },
+                        "en": {
+                            "meaning": f"Translate the following words to {quiz_lang}",
+                            "example": f"Translate the following sentences to {quiz_lang}",
+                            "vietnamese": f"Translate the following sentences to {quiz_lang}"
+                        },
+                        "zh": {
+                            "meaning": f"把下面的词译成{quiz_lang}",
+                            "example": f"把下面的句子译成{quiz_lang}",
+                            "vietnamese": f"把下面的句子译成{quiz_lang}"
+                        },
+                        "ja": {
+                            "meaning": f"次の単語を{quiz_lang}に訳してください",
+                            "example": f"次の文を{quiz_lang}に訳してください",
+                            "vietnamese": f"次の文を{quiz_lang}に訳してください"
+                        }
+                    }
                     
-                    print(f"📢 [Instruction] {instruction}")
+                    instruction = instructions.get(bot_lang, instructions["vi"]).get(self.quiz_type_str, instructions["vi"]["meaning"])
+                    
+                    print(f"📢 [Instruction - {bot_lang}] {instruction}")
                     self._start_gif_animation()
-                    self.voice_manager.voice_manager.speak_google_tts(instruction, language="vi")
+                    self.voice_manager.voice_manager.speak_google_tts(instruction, language=bot_lang)
                     self._stop_gif_animation()
                     time.sleep(0.5)
                     self.instruction_shown = True
@@ -1360,7 +1394,8 @@ class LanguageQuizGUI:
                 # Đọc nội dung câu (không hướng dẫn)
                 print(f"📢 [Mode 1] Đọc câu hỏi VN: {meaning_part[:60]}...")
                 self._start_gif_animation()  # 🎨 Bắt đầu animate
-                self.voice_manager.voice_manager.speak_google_tts(meaning_part, language="vi")
+                bot_lang = self._get_bot_language_code()
+                self.voice_manager.voice_manager.speak_google_tts(meaning_part, language=bot_lang)
                 self._stop_gif_animation()  # 🎨 Dừng animate
                 time.sleep(0.3)
             
@@ -1368,16 +1403,37 @@ class LanguageQuizGUI:
             elif self.test_mode == 2:
                 # Chỉ đọc hướng dẫn ở câu đầu tiên
                 if not self.instruction_shown:
-                    if self.quiz_type_str == "meaning":
-                        instruction = "Hãy dịch các từ sau sang tiếng Việt"
-                    elif self.quiz_type_str == "example":
-                        instruction = "Hãy dịch các câu sau sang tiếng Việt"
-                    else:  # vietnamese
-                        instruction = "Hãy dịch các câu sau sang tiếng Việt"
+                    bot_lang = self._get_bot_language_code()
                     
-                    print(f"📢 [Instruction] {instruction}")
+                    # ⚡ Dictionary các câu hướng dẫn đa ngôn ngữ
+                    instructions = {
+                        "vi": {
+                            "meaning": "Hãy dịch các từ sau sang tiếng Việt",
+                            "example": "Hãy dịch các câu sau sang tiếng Việt",
+                            "vietnamese": "Hãy dịch các câu sau sang tiếng Việt"
+                        },
+                        "en": {
+                            "meaning": "Translate the following words to Vietnamese",
+                            "example": "Translate the following sentences to Vietnamese",
+                            "vietnamese": "Translate the following sentences to Vietnamese"
+                        },
+                        "zh": {
+                            "meaning": "把下面的词译成越南语",
+                            "example": "把下面的句子译成越南语",
+                            "vietnamese": "把下面的句子译成越南语"
+                        },
+                        "ja": {
+                            "meaning": "次の単語をベトナム語に訳してください",
+                            "example": "次の文をベトナム語に訳してください",
+                            "vietnamese": "次の文をベトナム語に訳してください"
+                        }
+                    }
+                    
+                    instruction = instructions.get(bot_lang, instructions["vi"]).get(self.quiz_type_str, instructions["vi"]["meaning"])
+                    
+                    print(f"📢 [Instruction - {bot_lang}] {instruction}")
                     self._start_gif_animation()
-                    self.voice_manager.voice_manager.speak_google_tts(instruction, language="vi")
+                    self.voice_manager.voice_manager.speak_google_tts(instruction, language=bot_lang)
                     self._stop_gif_animation()
                     time.sleep(0.5)
                     self.instruction_shown = True
@@ -1450,12 +1506,18 @@ class LanguageQuizGUI:
             # ✨ Đếm ngược TRONG LÚC NGHE (thread riêng)
             def countdown_during_listening():
                 for i in range(listen_timeout, 0, -1):
-                    if not self.quiz_active:
+                    if not self.quiz_active or not self.app_running:
                         return
-                    self.root.after(0, lambda sec=i: self.countdown_label.config(text=str(sec)))
+                    try:
+                        self.root.after(0, lambda sec=i: self.countdown_label.config(text=str(sec)))
+                    except (RuntimeError, tk.TclError):
+                        break  # Main loop đã dừng
                     time.sleep(1)
                 # Xóa countdown khi hết giờ
-                self.root.after(0, lambda: self.countdown_label.config(text=""))
+                try:
+                    self.root.after(0, lambda: self.countdown_label.config(text=""))
+                except (RuntimeError, tk.TclError):
+                    pass
             
             Thread(target=countdown_during_listening, daemon=True).start()
             
@@ -1486,6 +1548,39 @@ class LanguageQuizGUI:
             
             if not user_answer:
                 self._safe_show_feedback("❌ Không nhận dạng được. Hãy nói lại!")
+                
+                # Xác định correct_answer để lưu kết quả
+                question = self.quiz_engine.questions[self.current_question_idx]
+                if self.test_mode == 1:
+                    if self.quiz_type_str == "meaning":
+                        correct_answer = question.get("word")
+                    elif self.quiz_type_str == "example":
+                        quiz_lang = self._get_quiz_language_code()
+                        if quiz_lang == "Chinese":
+                            correct_answer = question.get("example_zh", question.get("example_en", ""))
+                        else:
+                            correct_answer = question.get("example_en", "")
+                    else:  # vietnamese
+                        correct_answer = question.get("example_vi")
+                else:  # Mode 2
+                    if self.quiz_type_str == "meaning":
+                        correct_answer = question.get("meaning")
+                    elif self.quiz_type_str == "example":
+                        correct_answer = question.get("example_vi")
+                    else:  # vietnamese
+                        correct_answer = question.get("example_vi")
+                
+                # Lưu kết quả với điểm 0
+                question_num = question.get("excel_row", self.current_question_idx + 1)
+                self.quiz_results.append({
+                    "question_num": question_num,
+                    "question": question.get("word"),
+                    "user_answer": "(Không trả lời)",
+                    "correct_answer": correct_answer,
+                    "score": 0,  # ❌ 0 điểm
+                    "attempt": 1
+                })
+                
                 # 🚀 Tự động tiến tới câu tiếp (thay vì treo)
                 time.sleep(2)
                 if self.quiz_active:
@@ -1585,7 +1680,16 @@ class LanguageQuizGUI:
                 
                 # Phát TTS trong thread riêng, tự đóng popup khi xong
                 def play_tts_async():
-                    self.voice_manager.voice_manager.speak_google_tts("Đúng!", language="vi")
+                    bot_lang = self._get_bot_language_code()
+                    # ⚡ Feedback đa ngôn ngữ
+                    feedback_texts = {
+                        "vi": "Đúng!",
+                        "en": "Correct!",
+                        "zh": "对了！",
+                        "ja": "正解！"
+                    }
+                    feedback_tts = feedback_texts.get(bot_lang, "Đúng!")
+                    self.voice_manager.voice_manager.speak_google_tts(feedback_tts, language=bot_lang)
                     # Đóng popup sau khi TTS xong
                     time.sleep(0.3)
                     if popup_ref[0] and self.app_running:
@@ -1608,13 +1712,35 @@ class LanguageQuizGUI:
                     answer_lang = "vi"
                 
                 # Chuẩn bị feedback
+                bot_lang = self._get_bot_language_code()
                 semantic_note = " (✓ Đúng về mặt ý nghĩa)" if is_semantic else ""
+                
+                # ⚡ Feedback đa ngôn ngữ
+                feedback_dict = {
+                    "vi": {
+                        "near": "Gần đúng! Đáp án chính xác là:",
+                        "wrong": "Sai rồi! Câu trả lời đúng là:"
+                    },
+                    "en": {
+                        "near": "Almost correct! The exact answer is:",
+                        "wrong": "Wrong! The correct answer is:"
+                    },
+                    "zh": {
+                        "near": "差不多！正确答案是：",
+                        "wrong": "错了！正确答案是："
+                    },
+                    "ja": {
+                        "near": "もう少し！正しい答えは：",
+                        "wrong": "間違い！正しい答えは："
+                    }
+                }
+                
                 if similarity >= 0.7:
-                    feedback_text = "Gần đúng! Đáp án chính xác là:"
+                    feedback_text = feedback_dict.get(bot_lang, feedback_dict["vi"])["near"]
                     popup_title = "⚠️ Gần Đúng"
                     feedback_msg = f"⚠️ Gần đúng!{semantic_note}\n\n✨ {correct_answer}"
                 else:
-                    feedback_text = "Sai rồi! Câu trả lời đúng là:"
+                    feedback_text = feedback_dict.get(bot_lang, feedback_dict["vi"])["wrong"]
                     popup_title = "❌ Sai Rồi"
                     feedback_msg = f"❌ Sai rồi!\n\n✨ {correct_answer}"
                 
@@ -1635,7 +1761,7 @@ class LanguageQuizGUI:
                         time.sleep(0.5)
                     else:
                         # Chế độ bình thường: phát TTS
-                        self.voice_manager.voice_manager.speak_google_tts(feedback_text, language="vi")
+                        self.voice_manager.voice_manager.speak_google_tts(feedback_text, language=bot_lang)
                         
                         # Dùng Polly cho Anh/Trung/Nhật, gTTS cho Việt
                         if answer_lang in ["en", "zh", "ja"]:
@@ -1998,6 +2124,28 @@ class LanguageQuizGUI:
         except:
             return "English"
     
+    def _get_bot_language_code(self):
+        """⚡ Lấy mã ngôn ngữ của chatbot từ combobox"""
+        bot_lang_display = self.bot_language_var.get()
+        lang_map = {
+            "Tiếng Việt": "vi",
+            "Tiếng Anh": "en",
+            "Tiếng Trung": "zh",
+            "Tiếng Nhật": "ja"
+        }
+        return lang_map.get(bot_lang_display, "vi")
+    
+    def _get_bot_language_code(self):
+        """⚡ Lấy mã ngôn ngữ của chatbot từ combobox"""
+        bot_lang_display = self.bot_language_var.get()
+        lang_map = {
+            "Tiếng Việt": "vi",
+            "Tiếng Anh": "en",
+            "Tiếng Trung": "zh",
+            "Tiếng Nhật": "ja"
+        }
+        return lang_map.get(bot_lang_display, "vi")
+    
     def _get_stt_language(self):
         """Map ngôn ngữ quiz → STT language code (xem xét test mode + quiz type)"""
         # Mode 2: Chatbot đọc foreign → User trả lời Vietnamese
@@ -2119,7 +2267,106 @@ class LanguageQuizGUI:
         
         # Nếu user nhập tên thì lưu tự động
         if user_name[0]:
-            # 🕐 Thêm timestamp
+            # � Tính điểm trung bình
+            total_points = sum(r.get("score", 0) for r in self.quiz_results)
+            num_questions = len(self.quiz_results)
+            avg_score = (total_points / (num_questions * 10)) * 100 if num_questions > 0 else 0
+            
+            # 🎤 Phát feedback đa ngôn ngữ dựa trên điểm
+            bot_lang = self._get_bot_language_code()
+            
+            # ⚡ Dictionary feedback theo mức điểm
+            feedback_messages = {
+                "vi": {
+                    "excellent": "Xuất sắc! Bạn đã làm rất tốt!",  # >= 90
+                    "good": "Tốt lắm! Bạn đang tiến bộ!",  # >= 75
+                    "pass": "Khá đấy! Hãy tiếp tục cố gắng!",  # >= 60
+                    "fail": "Cần cố gắng hơn nữa! Đừng bỏ cuộc!"  # < 60
+                },
+                "en": {
+                    "excellent": "Excellent! You did very well!",
+                    "good": "Good job! You're making progress!",
+                    "pass": "Not bad! Keep trying!",
+                    "fail": "Need more effort! Don't give up!"
+                },
+                "zh": {
+                    "excellent": "太棒了！你做得非常好！",
+                    "good": "很好！你在进步！",
+                    "pass": "不错！继续努力！",
+                    "fail": "需要更加努力！不要放弃！"
+                },
+                "ja": {
+                    "excellent": "素晴らしい！とても良くできました！",
+                    "good": "良くできました！上達しています！",
+                    "pass": "悪くないです！頑張り続けてください！",
+                    "fail": "もっと頑張りましょう！諾めないで！"
+                }
+            }
+            
+            # Chọn feedback dựa trên điểm
+            if avg_score >= 90:
+                feedback_key = "excellent"
+            elif avg_score >= 75:
+                feedback_key = "good"
+            elif avg_score >= 60:
+                feedback_key = "pass"
+            else:
+                feedback_key = "fail"
+            
+            feedback_text = feedback_messages.get(bot_lang, feedback_messages["vi"])[feedback_key]
+            
+            print(f"📊 Điểm trung bình: {avg_score:.1f}%")
+            print(f"🎤 Feedback: {feedback_text}")
+            
+            # 🎊 Hiển thị popup feedback
+            feedback_popup = tk.Toplevel(self.root)
+            feedback_popup.title("Feedback")
+            feedback_popup.geometry("400x150")
+            feedback_popup.resizable(False, False)
+            
+            # Set icon
+            try:
+                if self.icon_path.exists():
+                    feedback_popup.iconbitmap(str(self.icon_path))
+            except:
+                pass
+            
+            # Center popup
+            feedback_popup.transient(self.root)
+            feedback_popup.grab_set()
+            
+            # Frame chính
+            popup_frame = ttk.Frame(feedback_popup, padding=30)
+            popup_frame.pack(fill=tk.BOTH, expand=True)
+            
+            # Label với feedback text lớn và màu sắc
+            feedback_label = ttk.Label(
+                popup_frame, 
+                text=feedback_text,
+                font=("Arial", 16, "bold"),
+                foreground="#2E7D32" if avg_score >= 75 else "#D84315",
+                justify=tk.CENTER
+            )
+            feedback_label.pack(expand=True)
+            
+            # Phát TTS feedback trong thread riêng
+            def play_and_close():
+                try:
+                    self.voice_manager.voice_manager.speak_google_tts(feedback_text, language=bot_lang)
+                except Exception as e:
+                    print(f"⚠️ Lỗi TTS feedback: {e}")
+                finally:
+                    # Đóng popup sau khi TTS xong
+                    try:
+                        feedback_popup.destroy()
+                    except:
+                        pass
+            
+            threading.Thread(target=play_and_close, daemon=True).start()
+            
+            self.root.wait_window(feedback_popup)
+            
+            # �🕐 Thêm timestamp
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
             # Thêm tên và thời gian vào mỗi kết quả
