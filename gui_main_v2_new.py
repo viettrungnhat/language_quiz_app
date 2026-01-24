@@ -959,7 +959,7 @@ class LanguageQuizGUI:
 � CẤU TRÚC FILE EXCEL MẪU:
 
 ┌─────────┬─────────────┬──────────────────┬──────────────────┬──────────────────┐
-│ STT     │ word        │ meaning          │ example_en       │ example_vi       │
+│ No.     │ Word        │ Meaning          │ Example EN       │ Example VI       │
 ├─────────┼─────────────┼──────────────────┼──────────────────┼──────────────────┤
 │ 1       │ hello       │ xin chào         │ Hello, how are   │ Xin chào, bạn    │
 │         │             │                  │ you?             │ khỏe không?      │
@@ -971,8 +971,9 @@ class LanguageQuizGUI:
 │         │             │                  │ later            │ gặp lại          │
 └─────────┴─────────────┴──────────────────┴──────────────────┴──────────────────┘
 
-* Đối với tiếng Trung, thêm cột: example_zh
-* Đối với tiếng Nhật, thêm cột: example_ja
+* Đối với tiếng Trung: Example ZH thay cho Example EN
+* Đối với tiếng Nhật: Example JA thay cho Example EN
+* Cột No. chứa số thứ tự (1, 2, 3...)
 
 ══════════════════════════════════════════════════════════════
 
@@ -1035,7 +1036,7 @@ class LanguageQuizGUI:
                     response = messagebox.askyesno(
                         "Format không chuẩn",
                         f"⚠️ File '{Path(file_path).name}' không đúng format chuẩn.\n\n"
-                        "Format chuẩn: Word | Meaning | Example EN | Example VI\n\n"
+                        "Format chuẩn: No. | Word | Meaning | Example EN | Example VI\n\n"
                         "🔄 Bạn có muốn tự động chuyển đổi sang format chuẩn không?"
                     )
                     

@@ -69,22 +69,44 @@ def detect_file_structure(ws):
 def is_template_format(ws):
     """Kiểm tra xem file đã là format TEMPLATE chưa"""
     try:
-        headers = [
+        # Check for 5-column format with No.
+        headers_5col = [
+            ws['A1'].value,
+            ws['B1'].value,
+            ws['C1'].value,
+            ws['D1'].value,
+            ws['E1'].value
+        ]
+        
+        expected_5col = ["No.", "Word", "Meaning", "Example EN", "Example VI"]
+        if all(h and str(h).strip() == e for h, e in zip(headers_5col, expected_5col)):
+            return True
+        
+        # Check for 5-column Chinese format
+        expected_5col_zh = ["No.", "Word", "Meaning", "Example ZH", "Example VI"]
+        if all(h and str(h).strip() == e for h, e in zip(headers_5col, expected_5col_zh)):
+            return True
+        
+        # Check for 5-column Japanese format
+        expected_5col_ja = ["No.", "Word", "Meaning", "Example JA", "Example VI"]
+        if all(h and str(h).strip() == e for h, e in zip(headers_5col, expected_5col_ja)):
+            return True
+        
+        # Check for 4-column format (old format without No.)
+        headers_4col = [
             ws['A1'].value,
             ws['B1'].value,
             ws['C1'].value,
             ws['D1'].value
         ]
         
-        expected = ["Word", "Meaning", "Example EN", "Example VI"]
-        
-        # Check headers
-        if all(h and str(h).strip() == e for h, e in zip(headers, expected)):
+        expected_4col = ["Word", "Meaning", "Example EN", "Example VI"]
+        if all(h and str(h).strip() == e for h, e in zip(headers_4col, expected_4col)):
             return True
         
         # Check alternative headers (lowercase)
         expected_lower = ["word", "meaning", "example_en", "example_vi"]
-        if all(h and str(h).strip().lower() == e for h, e in zip(headers, expected_lower)):
+        if all(h and str(h).strip().lower() == e for h, e in zip(headers_4col, expected_lower)):
             return True
         
         return False
