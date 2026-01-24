@@ -992,16 +992,16 @@ class LanguageQuizGUI:
         def open_sample_file(lang):
             """Open sample file in Excel"""
             sample_files = {
-                "English": "sample_english.xlsx",
-                "Chinese": "sample_chinese.xlsx",
-                "Japanese": "sample_japanese.xlsx"
+                "English": "TEMPLATE_ENGLISH.xlsx",
+                "Chinese": "TEMPLATE_CHINESE.xlsx",
+                "Japanese": "TEMPLATE_JAPANESE.xlsx"
             }
-            file_path = Path(__file__).parent / sample_files.get(lang, "")
+            file_path = Path(__file__).parent / "data" / sample_files.get(lang, "")
             if file_path.exists():
                 import os
                 os.startfile(file_path)
             else:
-                messagebox.showinfo("File mẫu", f"File mẫu {lang} chưa có.\nVui lòng tạo file theo cấu trúc bảng ở trên.")
+                messagebox.showinfo("File mẫu", f"File mẫu {lang} chưa có trong thư mục data/\nĐường dẫn: {file_path}")
         
         ttk.Button(button_frame, text="🇬🇧 English", 
                   command=lambda: open_sample_file("English"), width=12).pack(side=tk.LEFT, padx=2)
