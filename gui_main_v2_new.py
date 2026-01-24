@@ -1,4 +1,4 @@
-"""
+f"""
 GUI VERSION 2.2 - Language Quiz with Enhanced Voice (v3)
 Giao diện đồ họa kiểm tra ngôn ngữ với Voice Quiz cải tiến
 - gTTS (Google Text-to-Speech) cho đọc chuẩn
@@ -849,8 +849,12 @@ class LanguageQuizGUI:
 1️⃣ CHỌN FILE VÀ SHEET:
    - Nhấn "Chon File Excel" để chọn file từ vựng của bạn
    - Chọn sheet từ dropdown (ví dụ: "English", "Chinese H3p2", v.v.)
-   - File Excel cần có các cột: word, meaning, example_en, example_vi, example_zh
-
+   - File Excel cần có các cột: No.	Word	Meaning	Example EN	Example VI
+   - File chuẩn trên rồi thì k cần convert. 
+   - Các file excel chưa convert (import sẽ tự động Convert) phải có định dạng kiểu : B1-từ vựng B2- nghĩa tiếng việt của từ đó
+       D1-câu tương ứng với từ ở B1, D2- nghĩa tiếng Việt của câu đó. Tiếp cứ như vậy :
+       B3-từ vựng B4- nghĩa tiếng việt của từ đó
+       D3-câu tương ứng với từ ở B1, D4- nghĩa tiếng Việt của câu đó. Tiếp cứ như vậy :.................
 2️⃣ KIỂM TRA MICROPHONE:
    - Chọn microphone từ danh sách
    - Nhấn "Test (5s)" để kiểm tra mic hoạt động
