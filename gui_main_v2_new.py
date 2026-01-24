@@ -164,6 +164,7 @@ class LanguageQuizGUI:
             "last_file": "", 
             "last_sheet": "", 
             "last_mic": 0,
+            "last_camera": 0,
             "quiz_type": "meaning",
             "test_mode": 1,
             "start_question": 1,
@@ -223,9 +224,9 @@ class LanguageQuizGUI:
         main_container = ttk.Frame(self.setup_tab)
         main_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # LEFT COLUMN
+        # LEFT COLUMN - Cài đặt (60% width)
         left_col = ttk.Frame(main_container)
-        left_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
+        left_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
         
         # File Selection
         file_frame = ttk.LabelFrame(left_col, text="📁 File & Sheet", padding=10)
@@ -279,9 +280,48 @@ class LanguageQuizGUI:
         self.test_mic_label = ttk.Label(test_frame, text="", foreground="gray", font=("Segoe UI", 8))
         self.test_mic_label.pack(side=tk.LEFT)
         
+        # Camera Settings (for Discord photo)
+        cam_frame = ttk.LabelFrame(left_col, text="📷 Camera (Discord)", padding=10)
+        cam_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        self.camera_combo = ttk.Combobox(cam_frame, state="readonly", width=35)
+        self.camera_combo.pack(fill=tk.X, pady=(0, 5))
+        
+        # Load cameras
+        self.camera_indices = []
+        try:
+            import cv2
+            camera_names = []
+            for i in range(10):  # Check first 10 camera indices
+                cap = cv2.VideoCapture(i)
+                if cap.isOpened():
+                    self.camera_indices.append(i)
+                    camera_names.append(f"Camera {i}")
+                    cap.release()
+            
+            if camera_names:
+                self.camera_combo['values'] = camera_names
+                saved_cam_idx = self.user_settings.get("last_camera", 0)
+                if saved_cam_idx < len(camera_names):
+                    self.camera_combo.current(saved_cam_idx)
+                else:
+                    self.camera_combo.current(0)
+            else:
+                self.camera_combo['values'] = ["(Không có camera)"]
+                self.camera_indices = []
+                self.camera_combo.current(0)
+        except Exception as e:
+            print(f"⚠️ Lỗi load camera: {e}")
+            self.camera_combo['values'] = ["(Không có camera)"]
+            self.camera_indices = []
+            self.camera_combo.current(0)
+        
+        ttk.Label(cam_frame, text="Ảnh sẽ được gửi kèm kết quả lên Discord", 
+                 font=("Segoe UI", 8), foreground="gray").pack(anchor=tk.W)
+        
         # Quiz Settings
         quiz_frame = ttk.LabelFrame(left_col, text="⚙️ Cài đặt Quiz", padding=10)
-        quiz_frame.pack(fill=tk.BOTH, expand=True)
+        quiz_frame.pack(fill=tk.X, pady=(0, 10))  # Không expand để không chiếm hết chỗ
         
         # Quiz type
         ttk.Label(quiz_frame, text="Loại:", font=("Segoe UI", 9, "bold")).pack(anchor=tk.W)
@@ -308,45 +348,9 @@ class LanguageQuizGUI:
         self.shuffle_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(quiz_frame, text="🔀 Trộn câu hỏi", variable=self.shuffle_var).pack(anchor=tk.W, pady=3)
         
-        ttk.Separator(quiz_frame, orient='horizontal').pack(fill=tk.X, pady=8)
-        
-        # Voice Selection (English & Japanese)
-        ttk.Label(quiz_frame, text="🎙️ Giọng đọc:", font=("Segoe UI", 9, "bold")).pack(anchor=tk.W)
-        
-        # English voice
-        en_voice_frame = ttk.Frame(quiz_frame)
-        en_voice_frame.pack(fill=tk.X, pady=3)
-        ttk.Label(en_voice_frame, text="English:", font=("Segoe UI", 9), width=10).pack(side=tk.LEFT)
-        self.en_voice_var = tk.StringVar(value="female")
-        ttk.Radiobutton(en_voice_frame, text="👩 Nữ (Joanna)", variable=self.en_voice_var, value="female").pack(side=tk.LEFT, padx=3)
-        ttk.Radiobutton(en_voice_frame, text="👨 Nam (Matthew)", variable=self.en_voice_var, value="male").pack(side=tk.LEFT, padx=3)
-        
-        # Japanese voice
-        ja_voice_frame = ttk.Frame(quiz_frame)
-        ja_voice_frame.pack(fill=tk.X, pady=3)
-        ttk.Label(ja_voice_frame, text="日本語:", font=("Segoe UI", 9), width=10).pack(side=tk.LEFT)
-        self.ja_voice_var = tk.StringVar(value="female")
-        ttk.Radiobutton(ja_voice_frame, text="👩 Nữ (Mizuki)", variable=self.ja_voice_var, value="female").pack(side=tk.LEFT, padx=3)
-        ttk.Radiobutton(ja_voice_frame, text="👨 Nam (Takumi)", variable=self.ja_voice_var, value="male").pack(side=tk.LEFT, padx=3)
-        
-        # Faster Feedback Option
-        self.faster_feedback_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(quiz_frame, text="⚡ Phản hồi nhanh (chỉ text, bỏ TTS)", 
-                       variable=self.faster_feedback_var).pack(anchor=tk.W, pady=5)
-        
-        ttk.Separator(quiz_frame, orient='horizontal').pack(fill=tk.X, pady=8)
-        
-        # Practice Mode Selection
-        ttk.Label(quiz_frame, text="📚 Chế độ Quiz:", font=("Segoe UI", 9, "bold")).pack(anchor=tk.W)
-        self.quiz_mode_var = tk.StringVar(value="normal")
-        ttk.Radiobutton(quiz_frame, text="📖 Normal - Toàn bộ từ", 
-                       variable=self.quiz_mode_var, value="normal").pack(anchor=tk.W, pady=2)
-        ttk.Radiobutton(quiz_frame, text="🎯 Practice - Ôn tập từ yếu (sai từ trước)", 
-                       variable=self.quiz_mode_var, value="practice").pack(anchor=tk.W, pady=2)
-        
-        # RIGHT COLUMN
+        # RIGHT COLUMN - Voice Quiz (40% width)
         right_col = ttk.Frame(main_container)
-        right_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 0))
+        right_col.pack(side=tk.LEFT, fill=tk.BOTH, padx=(10, 0))
         
         # Voice Mode
         mode_frame = ttk.LabelFrame(right_col, text="🎤 Chế độ Voice Quiz", padding=10)
@@ -357,6 +361,41 @@ class LanguageQuizGUI:
                        variable=self.test_mode_var, value=1, command=self._on_test_mode_change).pack(anchor=tk.W, pady=3)
         ttk.Radiobutton(mode_frame, text="Mode 2: Bot đọc EN/CN/JP → User nói VN", 
                        variable=self.test_mode_var, value=2, command=self._on_test_mode_change).pack(anchor=tk.W, pady=3)
+        
+        # Voice Settings - Di chuyển từ left column
+        voice_frame = ttk.LabelFrame(right_col, text="🎙️ Giọng đọc & Tùy chọn", padding=10)
+        voice_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # English voice
+        en_voice_frame = ttk.Frame(voice_frame)
+        en_voice_frame.pack(fill=tk.X, pady=3)
+        ttk.Label(en_voice_frame, text="English:", font=("Segoe UI", 9), width=10).pack(side=tk.LEFT)
+        self.en_voice_var = tk.StringVar(value="female")
+        ttk.Radiobutton(en_voice_frame, text="👩 Nữ (Joanna)", variable=self.en_voice_var, value="female").pack(side=tk.LEFT, padx=3)
+        ttk.Radiobutton(en_voice_frame, text="👨 Nam (Matthew)", variable=self.en_voice_var, value="male").pack(side=tk.LEFT, padx=3)
+        
+        # Japanese voice
+        ja_voice_frame = ttk.Frame(voice_frame)
+        ja_voice_frame.pack(fill=tk.X, pady=3)
+        ttk.Label(ja_voice_frame, text="日本語:", font=("Segoe UI", 9), width=10).pack(side=tk.LEFT)
+        self.ja_voice_var = tk.StringVar(value="female")
+        ttk.Radiobutton(ja_voice_frame, text="👩 Nữ (Mizuki)", variable=self.ja_voice_var, value="female").pack(side=tk.LEFT, padx=3)
+        ttk.Radiobutton(ja_voice_frame, text="👨 Nam (Takumi)", variable=self.ja_voice_var, value="male").pack(side=tk.LEFT, padx=3)
+        
+        ttk.Separator(voice_frame, orient='horizontal').pack(fill=tk.X, pady=8)
+        
+        # Quiz mode
+        ttk.Label(voice_frame, text="📚 Chế độ Quiz:", font=("Segoe UI", 9, "bold")).pack(anchor=tk.W)
+        self.quiz_mode_var = tk.StringVar(value="normal")
+        ttk.Radiobutton(voice_frame, text="📖 Normal - Toàn bộ từ", 
+                       variable=self.quiz_mode_var, value="normal").pack(anchor=tk.W, pady=2)
+        ttk.Radiobutton(voice_frame, text="🎯 Practice - Ôn tập từ yếu", 
+                       variable=self.quiz_mode_var, value="practice").pack(anchor=tk.W, pady=2)
+        
+        # Faster Feedback Option
+        self.faster_feedback_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(voice_frame, text="⚡ Phản hồi nhanh (chỉ text, bỏ TTS)", 
+                       variable=self.faster_feedback_var).pack(anchor=tk.W, pady=5)
         
         # Start Buttons
         button_frame = ttk.LabelFrame(right_col, text="🚀 Bắt đầu", padding=15)
@@ -1000,6 +1039,7 @@ class LanguageQuizGUI:
         # Lưu ALL settings
         self.user_settings["last_sheet"] = self.sheet_combo.get()
         self.user_settings["last_mic"] = self.mic_combo.current()
+        self.user_settings["last_camera"] = self.camera_combo.current()
         self.user_settings["quiz_type"] = self.quiz_type_var.get()
         self.user_settings["test_mode"] = self.test_mode_var.get()
         self.user_settings["start_question"] = self.start_question_var.get()
@@ -1980,8 +2020,10 @@ class LanguageQuizGUI:
         ttk.Label(frame, text="👤 Nhập tên của bạn:", font=("Arial", 10)).pack(anchor=tk.W, pady=(0, 5))
         
         entry = ttk.Entry(frame, width=30, font=("Arial", 10))
+        entry.insert(0, "Test Phuong Anh")  # ✨ Default name
         entry.pack(fill=tk.X, pady=(0, 15))
         entry.focus()
+        entry.select_range(0, tk.END)  # Select all text for easy editing
         
         user_name = [None]  # Để lưu kết quả từ dialog
         
@@ -2014,6 +2056,9 @@ class LanguageQuizGUI:
             
             # 💾 Tự động lưu file JSON
             self._auto_save_results(user_name[0], timestamp)
+            
+            # 📤 Gửi kết quả lên Discord
+            self._send_to_discord(user_name[0], timestamp)
             
             print(f"✅ Lưu kết quả với tên: {user_name[0]}, Thời gian: {timestamp}")
         
@@ -2148,6 +2193,119 @@ class LanguageQuizGUI:
             print(f"✅ Đã lưu tự động: {file_path}")
         except Exception as e:
             print(f"⚠️ Lỗi lưu tự động: {e}")
+    
+    def _send_to_discord(self, user_name, timestamp):
+        """📤 Gửi kết quả và ảnh lên Discord webhook"""
+        try:
+            import requests
+            import io
+            import os
+            from dotenv import load_dotenv
+            
+            # Load Discord webhook URL from .env
+            load_dotenv()
+            webhook_url = os.getenv('DISCORD_WEBHOOK_URL')
+            
+            if not webhook_url:
+                print("⚠️ DISCORD_WEBHOOK_URL không tìm thấy trong .env file")
+                return
+            
+            # Tính toán thống kê
+            total_points = sum(r.get("score", 0) for r in self.quiz_results)
+            num_questions = len(self.quiz_results)
+            avg_score = (total_points / (num_questions * 10)) * 100 if num_questions > 0 else 0
+            
+            if avg_score >= 90:
+                grade = "A - Xuất sắc 🌟"
+            elif avg_score >= 80:
+                grade = "B - Tốt 👍"
+            elif avg_score >= 70:
+                grade = "C - Khá 👌"
+            elif avg_score >= 60:
+                grade = "D - Đạt ✓"
+            else:
+                grade = "F - Chưa đạt 📚"
+            
+            # Lấy thông tin file và phạm vi câu hỏi
+            file_name = os.path.basename(self.selected_file) if hasattr(self, 'selected_file') and self.selected_file else "Unknown"
+            start_q = self.start_question_var.get()
+            end_q = self.end_question_var.get()
+            
+            # Tạo nội dung message
+            message_content = f"""
+📊 **KẾT QUẢ KIỂM TRA**
+═══════════════════════════════════════
+👤 **Học sinh:** {user_name}
+🕐 **Thời gian:** {timestamp}
+📁 **File:** {file_name}
+📝 **Phạm vi:** từ câu {start_q} đến câu {end_q}
+
+📈 **TỔNG HỢP:**
+   • Điểm trung bình: **{avg_score:.1f}/100**
+   • Xếp loại: **{grade}**
+   • Tổng điểm: **{total_points}/{num_questions * 10}**
+
+📋 **CHI TIẾT ({num_questions} câu):**
+"""
+            
+            # Thêm 5 câu đầu tiên
+            for idx, result in enumerate(self.quiz_results[:5], 1):
+                question_num = result.get('question_num', idx)
+                score = result.get('score', 0)
+                emoji = "✅" if score >= 8 else "⚠️" if score >= 5 else "❌"
+                message_content += f"\n{emoji} **#{question_num}** {result['question']}: {score}/10"
+            
+            if num_questions > 5:
+                message_content += f"\n... và {num_questions - 5} câu khác"
+            
+            # Chụp ảnh từ camera
+            photo_data = None
+            try:
+                import cv2
+                import numpy as np
+                
+                # Lấy camera index
+                cam_idx = 0
+                if self.camera_indices:
+                    combo_idx = self.camera_combo.current()
+                    if combo_idx >= 0 and combo_idx < len(self.camera_indices):
+                        cam_idx = self.camera_indices[combo_idx]
+                
+                cap = cv2.VideoCapture(cam_idx)
+                if cap.isOpened():
+                    # Đọc vài frame để camera ổn định
+                    for _ in range(5):
+                        cap.read()
+                    
+                    ret, frame = cap.read()
+                    if ret:
+                        # Convert to JPEG
+                        _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
+                        photo_data = buffer.tobytes()
+                        print("✅ Đã chụp ảnh từ camera")
+                    cap.release()
+            except Exception as cam_err:
+                print(f"⚠️ Không thể chụp ảnh: {cam_err}")
+            
+            # Gửi lên Discord
+            files = {}
+            if photo_data:
+                files['file'] = ('photo.jpg', io.BytesIO(photo_data), 'image/jpeg')
+            
+            payload = {
+                'content': message_content,
+                'username': 'Quiz Bot 🎓'
+            }
+            
+            response = requests.post(webhook_url, data=payload, files=files if files else None)
+            
+            if response.status_code == 204 or response.status_code == 200:
+                print(f"✅ Đã gửi kết quả lên Discord{'(+ảnh)' if photo_data else ''}")
+            else:
+                print(f"⚠️ Discord webhook failed: {response.status_code}")
+                
+        except Exception as e:
+            print(f"⚠️ Lỗi gửi Discord: {e}")
     
     def save_results(self):
         """Lưu kết quả"""
