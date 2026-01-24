@@ -17,7 +17,7 @@ from voice_quiz_v2 import VoiceQuizManager
 from db_manager import StudyHistoryDB
 from pathlib import Path
 import json
-from threading import Thread
+from threading import Thread, Lock
 import tkinter.font as tkFont
 import winsound  # Để phát beep sound
 from datetime import datetime  # 🕐 Để lưu timestamp
@@ -53,6 +53,8 @@ class LanguageQuizGUI:
         self.test_mode = 1  # 1: Read VN → Answer Foreign | 2: Read Foreign → Answer VN
         self.feedback_thread = None  # Track feedback TTS
         self.app_running = True  # Flag để dừng threads khi app đóng
+        self.voice_question_lock = Lock()  # 🔒 Lock để đảm bảo chỉ 1 câu hỏi voice chạy tại 1 thời điểm
+        self.instruction_shown = False  # Track xem instruction đã được đọc chưa
         
         # Config file
         self.config_file = Path(__file__).parent / "user_settings.json"
@@ -164,7 +166,6 @@ class LanguageQuizGUI:
             "last_mic": 0,
             "quiz_type": "meaning",
             "test_mode": 1,
-            "num_questions": 10,
             "start_question": 1,
             "end_question": 10,
             "shuffle": True,
@@ -205,7 +206,6 @@ class LanguageQuizGUI:
             self.test_mode_var.set(self.user_settings.get("test_mode", 1))
             # 🔧 Cập nhật self.test_mode khi load (vì .set() không gọi callback)
             self.test_mode = self.user_settings.get("test_mode", 1)
-            self.num_questions_var.set(self.user_settings.get("num_questions", 10))
             self.start_question_var.set(self.user_settings.get("start_question", 1))
             self.end_question_var.set(self.user_settings.get("end_question", 10))
             self.shuffle_var.set(self.user_settings.get("shuffle", True))
@@ -291,16 +291,8 @@ class LanguageQuizGUI:
         
         ttk.Separator(quiz_frame, orient='horizontal').pack(fill=tk.X, pady=8)
         
-        # Number of questions
-        ttk.Label(quiz_frame, text="Số câu:", font=("Segoe UI", 9, "bold")).pack(anchor=tk.W)
-        num_frame = ttk.Frame(quiz_frame)
-        num_frame.pack(fill=tk.X, pady=3)
-        
-        self.num_questions_var = tk.IntVar(value=10)
-        for num in [5, 10, 15, 20]:
-            ttk.Radiobutton(num_frame, text=str(num), variable=self.num_questions_var, value=num).pack(side=tk.LEFT, padx=5)
-        
-        # Range
+        # Range - Chọn từ câu nào đến câu nào
+        ttk.Label(quiz_frame, text="Phạm vi câu hỏi:", font=("Segoe UI", 9, "bold")).pack(anchor=tk.W)
         range_frame = ttk.Frame(quiz_frame)
         range_frame.pack(fill=tk.X, pady=5)
         ttk.Label(range_frame, text="Từ:", font=("Segoe UI", 9)).pack(side=tk.LEFT)
@@ -748,6 +740,44 @@ class LanguageQuizGUI:
             initialdir=Path(self.user_settings.get("last_file", "")).parent if self.user_settings.get("last_file") else None
         )
         if file_path:
+            # ✨ Auto-detect và convert nếu cần
+            from file_converter import convert_file_auto, is_template_format
+            import openpyxl
+            
+            try:
+                # Kiểm tra format
+                wb_temp = openpyxl.load_workbook(file_path)
+                ws_temp = wb_temp.active
+                
+                if not is_template_format(ws_temp):
+                    # Hỏi user có muốn convert không
+                    response = messagebox.askyesno(
+                        "Format không chuẩn",
+                        f"⚠️ File '{Path(file_path).name}' không đúng format chuẩn.\n\n"
+                        "Format chuẩn: Word | Meaning | Example EN | Example VI\n\n"
+                        "🔄 Bạn có muốn tự động chuyển đổi sang format chuẩn không?"
+                    )
+                    
+                    if response:
+                        # Convert file
+                        success, message, output_path = convert_file_auto(file_path)
+                        
+                        if success and output_path:
+                            messagebox.showinfo("Thành công", message)
+                            file_path = output_path  # Dùng file đã convert
+                        else:
+                            messagebox.showerror("Lỗi convert", message)
+                            return
+                    else:
+                        messagebox.showwarning("Cảnh báo", 
+                            "⚠️ File không chuẩn có thể gây lỗi khi học!\n\n"
+                            "Bạn vẫn có thể thử tiếp, nhưng nên convert về format chuẩn.")
+                
+                wb_temp.close()
+            except Exception as e:
+                print(f"⚠️ Lỗi kiểm tra format: {e}")
+            
+            # Tiếp tục load file bình thường
             self.selected_file = file_path
             self.file_label.config(text=f"✓ {Path(file_path).name}", foreground="green")
             
@@ -774,19 +804,37 @@ class LanguageQuizGUI:
             wb = openpyxl.load_workbook(self.selected_file, data_only=True)
             ws = wb[sheet_name]
             
+            # Kiểm tra header để xác định format
+            header_row = list(ws.iter_rows(min_row=1, max_row=1, values_only=True))[0]
+            has_no_column = False
+            word_col = 0
+            meaning_col = 1
+            example_en_col = 2
+            example_vi_col = 3
+            
+            # Nếu cột đầu tiên là "No." hoặc số → có cột số thứ tự
+            if header_row and (str(header_row[0]).lower() in ["no.", "no", "#", "stt"]):
+                has_no_column = True
+                word_col = 1
+                meaning_col = 2
+                example_en_col = 3
+                example_vi_col = 4
+            
             data = []
             for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-                if not row[0]:
+                if not row or not row[word_col]:
                     continue
-                if len(row) < 4:
+                if len(row) < (example_vi_col + 1):
                     continue
                 
+                # Lưu số thứ tự thực tế trong Excel (row_idx - 1 vì header ở row 1)
                 item = {
                     "id": len(data) + 1,
-                    "word": str(row[0]).strip() if row[0] else "",
-                    "meaning": str(row[1]).strip() if row[1] else "",
-                    "example_en": str(row[2]).strip() if row[2] else "",
-                    "example_vi": str(row[3]).strip() if row[3] else ""
+                    "excel_row": row_idx - 1,  # ✨ Số thứ tự trong Excel (1, 2, 3...)
+                    "word": str(row[word_col]).strip() if row[word_col] else "",
+                    "meaning": str(row[meaning_col]).strip() if row[meaning_col] else "",
+                    "example_en": str(row[example_en_col]).strip() if row[example_en_col] else "",
+                    "example_vi": str(row[example_vi_col]).strip() if row[example_vi_col] else ""
                 }
                 
                 if item["word"] and item["meaning"]:
@@ -812,7 +860,6 @@ class LanguageQuizGUI:
         # Lưu settings
         self.user_settings["last_sheet"] = self.sheet_combo.get()
         self.user_settings["quiz_type"] = self.quiz_type_var.get()
-        self.user_settings["num_questions"] = self.num_questions_var.get()
         self.user_settings["start_question"] = self.start_question_var.get()
         self.user_settings["end_question"] = self.end_question_var.get()
         self.user_settings["shuffle"] = self.shuffle_var.get()
@@ -824,7 +871,7 @@ class LanguageQuizGUI:
         
         self.quiz_type_str = self.quiz_type_var.get()
         
-        # Xử lý range
+        # Xử lý range - lấy tất cả câu trong khoảng
         start_idx = self.start_question_var.get() - 1
         end_idx = self.end_question_var.get()
         
@@ -837,14 +884,13 @@ class LanguageQuizGUI:
             return
         
         selected_data = self.data[start_idx:end_idx]
-        num_questions = min(self.num_questions_var.get(), len(selected_data))
         
         self.quiz_engine = QuizEngine(selected_data, language="English")
         
         if self.shuffle_var.get():
-            self.quiz_engine.shuffle_questions(num_questions)
+            self.quiz_engine.shuffle_questions(len(selected_data))  # Shuffle tất cả
         else:
-            self.quiz_engine.questions = selected_data[:num_questions]
+            self.quiz_engine.questions = selected_data  # Lấy tất cả trong range
         
         self.quiz_engine.quiz_type = self.quiz_type_str
         
@@ -904,13 +950,11 @@ class LanguageQuizGUI:
                         question.get("example_en") if self.quiz_type_str == "example" else \
                         question.get("example_vi")
         
-        is_correct, feedback = self.quiz_engine.check_answer(user_answer, correct_answer, self.attempt)
+        is_correct, feedback, score, is_semantic = self.quiz_engine.check_answer(user_answer, correct_answer, self.attempt)
         
-        score = 10 if is_correct and self.attempt == 1 else \
-               7 if is_correct and self.attempt == 2 else \
-               4 if is_correct else 0
-        
+        question_num = question.get("excel_row", self.current_question_idx + 1)  # Số thứ tự từ Excel
         self.quiz_results.append({
+            "question_num": question_num,  # ✨ Số thứ tự từ Excel
             "question": question.get("word"),
             "user_answer": user_answer,
             "correct_answer": correct_answer,
@@ -920,7 +964,8 @@ class LanguageQuizGUI:
         
         self.feedback_text.config(state=tk.NORMAL)
         self.feedback_text.delete(1.0, tk.END)
-        self.feedback_text.insert(tk.END, f"{feedback}\n\n💡 Đáp án đúng: {correct_answer}")
+        semantic_note = " (✓ Đúng về mặt ý nghĩa)" if is_semantic else ""
+        self.feedback_text.insert(tk.END, f"{feedback}{semantic_note}\n\n💡 Đáp án đúng: {correct_answer}")
         self.feedback_text.config(state=tk.DISABLED)
         
         if is_correct or self.attempt >= 3:
@@ -957,7 +1002,6 @@ class LanguageQuizGUI:
         self.user_settings["last_mic"] = self.mic_combo.current()
         self.user_settings["quiz_type"] = self.quiz_type_var.get()
         self.user_settings["test_mode"] = self.test_mode_var.get()
-        self.user_settings["num_questions"] = self.num_questions_var.get()
         self.user_settings["start_question"] = self.start_question_var.get()
         self.user_settings["end_question"] = self.end_question_var.get()
         self.user_settings["shuffle"] = self.shuffle_var.get()
@@ -1005,7 +1049,7 @@ class LanguageQuizGUI:
             if not self.data:
                 return
             
-            # Xử lý range selection
+            # Xử lý range selection - lấy tất cả câu trong khoảng
             start_idx = self.start_question_var.get() - 1  # Convert to 0-based
             end_idx = self.end_question_var.get()
             
@@ -1018,17 +1062,14 @@ class LanguageQuizGUI:
                 messagebox.showerror("Lỗi", f"❌ Khoảng không hợp lệ!\nCâu bắt đầu phải < câu kết thúc.\n\nTổng số câu: {len(self.data)}")
                 return
             
-            # Slice data theo range
+            # Slice data theo range - lấy TẤT CẢ
             selected_data = self.data[start_idx:end_idx]
-            
-            # Số câu thực tế
-            num_questions_requested = self.num_questions_var.get()
-            num_questions = min(num_questions_requested, len(selected_data))
+            num_questions = len(selected_data)
             
             if self.shuffle_var.get():
                 mode_text = f"🔀 Trộn {num_questions} câu"
             else:
-                mode_text = f"📋 Theo thứ tự: câu {start_idx+1}-{start_idx+num_questions}"
+                mode_text = f"📋 Theo thứ tự: câu {start_idx+1}-{end_idx}"
         
         self.quiz_type_str = self.quiz_type_var.get()
         self.quiz_engine = QuizEngine(selected_data, language="English")
@@ -1038,7 +1079,7 @@ class LanguageQuizGUI:
             if self.shuffle_var.get():
                 self.quiz_engine.shuffle_questions(num_questions)
             else:
-                self.quiz_engine.questions = selected_data[:num_questions]
+                self.quiz_engine.questions = selected_data  # Lấy tất cả
         else:
             # Practice mode: không shuffle, toàn bộ weak words
             self.quiz_engine.questions = selected_data
@@ -1047,6 +1088,7 @@ class LanguageQuizGUI:
         
         self.current_question_idx = 0
         self.quiz_results = []
+        self.instruction_shown = False  # Reset instruction cho quiz mới
         self.quiz_mode = quiz_mode  # Store mode for use in quiz
         
         # 🚀 Dừng quiz cũ nếu đang chạy
@@ -1095,6 +1137,7 @@ class LanguageQuizGUI:
             return
         
         question = self.quiz_engine.questions[self.current_question_idx]
+        question_num = question.get("excel_row", self.current_question_idx + 1)  # Số thứ tự từ Excel
         
         # Format câu hỏi theo Mode và quiz type (để hiển thị text)
         quiz_lang = self._get_quiz_language_code()
@@ -1130,7 +1173,8 @@ class LanguageQuizGUI:
         font = self._choose_font(question_text)
         self.voice_question_text.config(font=font)
         
-        self.voice_question_text.insert(tk.END, f"❓ {question_text}")
+        # ✨ Hiển thị số thứ tự câu
+        self.voice_question_text.insert(tk.END, f"#{question_num} ❓ {question_text}")
         
         # 🎯 In thêm thông tin từ yếu (nếu là Practice Mode)
         if hasattr(self, 'quiz_mode') and self.quiz_mode == "practice":
@@ -1161,6 +1205,8 @@ class LanguageQuizGUI:
     
     def _process_voice_question(self, question_text):
         """Phát 2 lần (Tiếng Việt + tiếng nước ngoài) + đếm ngược + lắng nghe + feedback (thread)"""
+        # 🔒 Acquire lock để đảm bảo chỉ 1 câu hỏi xử lý tại một thời điểm
+        self.voice_question_lock.acquire()
         try:
             import time
             
@@ -1204,25 +1250,50 @@ class LanguageQuizGUI:
             
             # Mode 1: Đọc Tiếng Việt (gTTS) - User trả lời bằng Foreign language
             if self.test_mode == 1:
-                # Ghép câu hỏi tiếng Việt hoàn chỉnh
-                quiz_lang = self._get_quiz_language_code()
-                lang_name = "tiếng Anh" if quiz_lang == "English" else ("tiếng Trung" if quiz_lang == "Chinese" else "tiếng Nhật")
+                # Chỉ đọc hướng dẫn ở câu đầu tiên
+                if not self.instruction_shown:
+                    quiz_lang = self._get_quiz_language_code()
+                    lang_name = "tiếng Anh" if quiz_lang == "English" else ("tiếng Trung" if quiz_lang == "Chinese" else "tiếng Nhật")
+                    
+                    if self.quiz_type_str == "meaning":
+                        instruction = f"Hãy dịch các từ sau sang {lang_name}"
+                    elif self.quiz_type_str == "example":
+                        instruction = f"Hãy dịch các câu sau sang {lang_name}"
+                    else:  # vietnamese
+                        instruction = f"Hãy dịch các câu sau sang {lang_name}"
+                    
+                    print(f"📢 [Instruction] {instruction}")
+                    self._start_gif_animation()
+                    self.voice_manager.voice_manager.speak_google_tts(instruction, language="vi")
+                    self._stop_gif_animation()
+                    time.sleep(0.5)
+                    self.instruction_shown = True
                 
-                if self.quiz_type_str == "meaning":
-                    vn_question = f"Từ có nghĩa là '{meaning_part}' trong {lang_name} là gì?"
-                elif self.quiz_type_str == "example":
-                    vn_question = f"Câu '{meaning_part}' dịch sang {lang_name} là gì?"
-                else:  # vietnamese
-                    vn_question = f"Câu '{meaning_part}' dịch sang {lang_name} là gì?"
-                
-                print(f"📢 [Mode 1] Đọc câu hỏi VN: {vn_question[:60]}...")
+                # Đọc nội dung câu (không hướng dẫn)
+                print(f"📢 [Mode 1] Đọc câu hỏi VN: {meaning_part[:60]}...")
                 self._start_gif_animation()  # 🎨 Bắt đầu animate
-                self.voice_manager.voice_manager.speak_google_tts(vn_question, language="vi")
+                self.voice_manager.voice_manager.speak_google_tts(meaning_part, language="vi")
                 self._stop_gif_animation()  # 🎨 Dừng animate
                 time.sleep(0.3)
             
             # Mode 2: Đọc Foreign language (Polly) + Câu hỏi VN (gTTS) - User trả lời bằng Tiếng Việt
             elif self.test_mode == 2:
+                # Chỉ đọc hướng dẫn ở câu đầu tiên
+                if not self.instruction_shown:
+                    if self.quiz_type_str == "meaning":
+                        instruction = "Hãy dịch các từ sau sang tiếng Việt"
+                    elif self.quiz_type_str == "example":
+                        instruction = "Hãy dịch các câu sau sang tiếng Việt"
+                    else:  # vietnamese
+                        instruction = "Hãy dịch các câu sau sang tiếng Việt"
+                    
+                    print(f"📢 [Instruction] {instruction}")
+                    self._start_gif_animation()
+                    self.voice_manager.voice_manager.speak_google_tts(instruction, language="vi")
+                    self._stop_gif_animation()
+                    time.sleep(0.5)
+                    self.instruction_shown = True
+                
                 # Xác định ngôn ngữ TTS từ quiz language
                 quiz_lang = self._get_quiz_language_code()
                 lang_map = {
@@ -1250,20 +1321,6 @@ class LanguageQuizGUI:
                     print(f"📢 [Mode 2] Đọc {quiz_lang} (gTTS): {foreign_part[:60]}...")
                     self.voice_manager.voice_manager.speak_google_tts(foreign_part, language=tts_lang)
                 time.sleep(0.5)
-                
-                # Đọc câu hỏi tiếng Việt
-                if self.quiz_type_str == "meaning":
-                    vn_question = "có nghĩa tiếng Việt là gì?"
-                elif self.quiz_type_str == "example":
-                    vn_question = "dịch sang tiếng Việt là gì?"
-                else:  # vietnamese
-                    vn_question = "dịch sang tiếng Việt là gì?"
-                
-                print(f"📢 [Mode 2] Đọc câu hỏi VN: {vn_question}...")
-                self._start_gif_animation()  # 🎨 Bắt đầu animate
-                self.voice_manager.voice_manager.speak_google_tts(vn_question, language="vi")
-                self._stop_gif_animation()  # 🎨 Dừng animate
-                time.sleep(0.3)
             
             # Bỏ đếm ngược - Đọc xong câu hỏi → có thể trả lời ngay
             print("\n▶️ Sẵn sàng trả lời!")
@@ -1306,7 +1363,8 @@ class LanguageQuizGUI:
             
             user_answer = self.voice_manager.voice_manager.listen_to_microphone(
                 timeout=15, 
-                language=language_stt
+                language=language_stt,
+                quiz_type=self.quiz_type_str  # "meaning", "example", hoặc "vietnamese"
             )
             
             # Reset mic status
@@ -1360,11 +1418,13 @@ class LanguageQuizGUI:
                 else:  # vietnamese
                     correct_answer = question.get("example_vi")  # Dịch tiếng Việt
             
-            is_correct, similarity, _ = self.voice_manager.compare_answers(user_answer, correct_answer)
+            is_correct, similarity, _, is_semantic = self.voice_manager.compare_answers(user_answer, correct_answer)
             
             # Lưu kết quả
             score = min(10, int(similarity * 10)) if is_correct else max(0, int(similarity * 5))
+            question_num = question.get("excel_row", self.current_question_idx + 1)  # Số thứ tự từ Excel
             self.quiz_results.append({
+                "question_num": question_num,  # ✨ Số thứ tự từ Excel
                 "question": question.get("word"),
                 "user_answer": user_answer,
                 "correct_answer": correct_answer,
@@ -1435,16 +1495,17 @@ class LanguageQuizGUI:
                     answer_lang = "vi"
                 
                 # Chuẩn bị feedback
+                semantic_note = " (✓ Đúng về mặt ý nghĩa)" if is_semantic else ""
                 if similarity >= 0.7:
                     feedback_text = "Gần đúng! Đáp án chính xác là:"
                     popup_title = "⚠️ Gần Đúng"
-                    feedback_msg = f"⚠️ Gần đúng!\n\n✨ {correct_answer}"
+                    feedback_msg = f"⚠️ Gần đúng!{semantic_note}\n\n✨ {correct_answer}"
                 else:
                     feedback_text = "Sai rồi! Câu trả lời đúng là:"
                     popup_title = "❌ Sai Rồi"
                     feedback_msg = f"❌ Sai rồi!\n\n✨ {correct_answer}"
                 
-                popup_msg = f"📝 Đáp án đúng:\n{correct_answer}\n\n🎤 Bạn trả lời:\n{user_answer}\n\n📊 Điểm: {score}/10"
+                popup_msg = f"📝 Đáp án đúng:\n{correct_answer}\n\n🎤 Bạn trả lời:\n{user_answer}{semantic_note}\n\n📊 Điểm: {score}/10"
                 self._safe_show_feedback(feedback_msg)
                 
                 # Hiển thị popup KHÔNG auto-close, để thread TTS tự đóng
@@ -1492,6 +1553,9 @@ class LanguageQuizGUI:
         except Exception as e:
             print(f"❌ Lỗi: {e}")
             self._safe_show_error(f"Lỗi: {e}")
+        finally:
+            # 🔒 Release lock khi xong
+            self.voice_question_lock.release()
     
     # ===== THREAD-SAFE TKINTER WRAPPERS =====
     
@@ -1960,7 +2024,8 @@ class LanguageQuizGUI:
     
     def show_results(self):
         """Hiển thị kết quả"""
-        if not self.quiz_results:
+        if not self.quiz_results or len(self.quiz_results) == 0:
+            messagebox.showinfo("Kết quả", "Không có kết quả để hiển thị!")
             return
         
         # 👤 Lấy tên user và timestamp từ kết quả (nếu có)
@@ -1997,8 +2062,9 @@ class LanguageQuizGUI:
 
 📋 CHI TIẾT TỪNG CÂU:
 """
-        for i, result in enumerate(self.quiz_results, 1):
-            report += f"\n{i}. {result['question']} (Lần {result['attempt']})\n"
+        for result in self.quiz_results:
+            question_num = result.get('question_num', '?')  # Lấy số thứ tự từ Excel
+            report += f"\n{question_num}. {result['question']} (Lần {result['attempt']})\n"
             report += f"   Bạn trả lời: {result['user_answer']}\n"
             report += f"   Đáp án: {result['correct_answer']}\n"
             report += f"   Điểm: {result['score']}/10\n"
@@ -2213,8 +2279,9 @@ class LanguageQuizGUI:
 
 📋 CHI TIẾT TỪNG CÂU:
 """
-        for i, result in enumerate(loaded_results, 1):
-            report += f"\n{i}. {result['question']} (Lần {result['attempt']})\n"
+        for result in loaded_results:
+            question_num = result.get('question_num', '?')  # Lấy số thứ tự từ Excel
+            report += f"\n{question_num}. {result['question']} (Lần {result['attempt']})\n"
             report += f"   Bạn trả lời: {result['user_answer']}\n"
             report += f"   Đáp án: {result['correct_answer']}\n"
             report += f"   Điểm: {result['score']}/10\n"

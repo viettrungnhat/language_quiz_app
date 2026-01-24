@@ -30,36 +30,36 @@ class QuizEngine:
     
     def format_question(self, question, quiz_type="meaning"):
         """
-        Định dạng câu hỏi theo loại
+        Định dạng câu hỏi theo loại (chỉ nội dung, không hướng dẫn)
         Types:
-        - meaning: Hỏi ý nghĩa tiếng Việt
-        - example: Hỏi dịch ví dụ tiếng Anh
-        - vietnamese: Hỏi dịch từ tiếng Việt sang tiếng Anh
+        - meaning: Hiển thị từ cần dịch
+        - example: Hiển thị câu tiếng Anh cần dịch
+        - vietnamese: Hiển thị câu tiếng Việt cần dịch
         """
         if quiz_type == "meaning":
-            return f"Từ '{question['word']}' có nghĩa là gì (tiếng Việt)?"
+            return f"'{question['word']}'"
         elif quiz_type == "example":
-            return f"Dịch ví dụ sau sang tiếng Việt:\n'{question['example_en']}'"
+            return f"'{question['example_en']}'"
         elif quiz_type == "vietnamese":
-            return f"Dịch sang tiếng Anh:\n'{question['example_vi']}'"
+            return f"'{question['example_vi']}'"
     
     def check_answer(self, user_answer, correct_answer, attempt=1):
         """
         Kiểm tra câu trả lời
-        Trả về: (is_correct, feedback, score)
+        Trả về: (is_correct, feedback, score, is_semantic)
         """
         print(f"\n🔍 QUIZ_ENGINE CHECK_ANSWER:")
         print(f"   User: '{user_answer}'")
         print(f"   Correct: '{correct_answer}'")
         
-        score, feedback = self.scorer.calculate_score(
-            user_answer, correct_answer, attempt
+        score, feedback, is_semantic = self.scorer.calculate_score(
+            user_answer, correct_answer, attempt, quiz_type=self.quiz_type
         )
         
-        print(f"   Score: {score}, Feedback: {feedback}")
+        print(f"   Score: {score}, Feedback: {feedback}, Semantic: {is_semantic}")
         
         is_correct = score >= 5  # Coi >= 5 là đúng
-        return is_correct, feedback, score
+        return is_correct, feedback, score, is_semantic
     
     def get_hint(self, question):
         """Cung cấp gợi ý"""

@@ -12,6 +12,7 @@ from quiz_engine import QuizEngine
 from scorer import Scorer
 from pathlib import Path
 import json
+from file_converter import convert_file_auto, is_template_format, detect_file_structure
 
 
 class LanguageQuizGUI:
@@ -172,7 +173,52 @@ class LanguageQuizGUI:
         
         if file_path:
             self.selected_file = file_path
-            self.file_label.config(text=f"✓ {Path(file_path).name}", foreground="green")
+            
+            # Kiểm tra format file
+            wb = openpyxl.load_workbook(file_path, data_only=True)
+            ws = wb.active
+            
+            is_template = is_template_format(ws)
+            
+            if not is_template:
+                # File không chuẩn, hỏi convert
+                structure, language, confidence = detect_file_structure(ws)
+                
+                convert_dialog = messagebox.askyesno(
+                    "⚠️ File Không Chuẩn Format",
+                    f"""📋 File của bạn không đúng TEMPLATE format
+
+📊 Detected: {structure}
+🌐 Language: {language or 'Unknown'}
+📈 Confidence: {confidence*100:.0f}%
+
+❓ Bạn muốn convert file sang format TEMPLATE không?
+   (File gốc sẽ không bị thay đổi)
+   
+✅ YES: Convert tự động
+❌ NO: Dùng file như hiện tại (có thể lỗi)"""
+                )
+                
+                if convert_dialog:
+                    # Convert file
+                    output_path = str(Path(file_path).parent / f"{Path(file_path).stem}_template.xlsx")
+                    success, message, new_file_path = convert_file_auto(file_path, output_path)
+                    
+                    if success:
+                        messagebox.showinfo("✅ Convert Thành Công", message)
+                        self.selected_file = new_file_path
+                        self.file_label.config(text=f"✓ {Path(new_file_path).name} (converted)", foreground="green")
+                    else:
+                        messagebox.showerror("❌ Convert Lỗi", message)
+                        self.file_label.config(text=f"✗ {Path(file_path).name} (lỗi convert)", foreground="red")
+                        self.selected_file = None
+                        return
+                else:
+                    # User chọn không convert
+                    self.file_label.config(text=f"⚠️ {Path(file_path).name} (cảnh báo)", foreground="orange")
+            else:
+                self.file_label.config(text=f"✓ {Path(file_path).name}", foreground="green")
+            
             self._load_excel_sheets()
     
     def _load_excel_sheets(self):

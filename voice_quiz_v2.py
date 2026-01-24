@@ -245,15 +245,27 @@ class VoiceManager:
         except Exception as e:
             print(f"Audio file error: {e}")
     
-    def listen_to_microphone(self, timeout: int = 10, language: str = "en-US") -> Optional[str]:
+    def listen_to_microphone(self, timeout: int = 10, language: str = "en-US", quiz_type: str = "meaning") -> Optional[str]:
         """
         Lắng nghe từ microphone và chuyển thành text
         Dùng Google Speech Recognition hoặc Whisper
+        
+        Args:
+            timeout: Tổng thời gian lắng nghe (giây)
+            language: Ngôn ngữ STT
+            quiz_type: Loại quiz ("meaning", "example", "vietnamese") để điều chỉnh thời gian lắng nghe
+        
         Returns: text hoặc None nếu lỗi
         """
         if not sr:
             print("❌ speech_recognition not installed")
             return None
+        
+        # Điều chỉnh phrase_time_limit dựa vào quiz_type
+        # "meaning": 4s (từ đơn, ngắn), "example"/"vietnamese": 12s (câu dài, phù hợp)
+        phrase_time_limit = 4 if quiz_type == "meaning" else 12
+        # Điều chỉnh pause_threshold tùy theo loại quiz
+        pause_threshold = 0.5 if quiz_type == "meaning" else 0.6
         
         try:
             with sr.Microphone() as source:
@@ -265,13 +277,14 @@ class VoiceManager:
                 
                 # ⚠️ KHÔNG dùng adjust_for_ambient_noise - nó sẽ ghi đè energy_threshold!
                 # Chỉ cần pause_threshold để cho phép giọng nói tự nhiên
-                self.recognizer.pause_threshold = 0.5
-                self.recognizer.phrase_time_limit = 3  # ⏱️ Nghe tối đa 3s một câu
+                self.recognizer.pause_threshold = pause_threshold
+                self.recognizer.phrase_time_limit = phrase_time_limit  # ⏱️ Thay đổi tùy theo loại quiz
                 
                 print(f"⚙️ Energy threshold: {self.recognizer.energy_threshold} (fixed)")
+                print(f"⏱️ Thời gian lắng nghe: {phrase_time_limit}s ({quiz_type})")
                 
                 # Ghi âm
-                audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=3)
+                audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_time_limit)
                 
                 # 🔊 Phát beep báo hiệu kết thúc
                 if winsound:
@@ -292,11 +305,12 @@ class VoiceManager:
                     print("⚠️ Lỗi kết nối. Kiểm tra internet connection.")
                     return None
         
-        except sr.Timeout:
-            print("❌ Hết thời gian. Hãy nói câu trả lời.")
-            return None
         except Exception as e:
-            print(f"❌ Lỗi microphone: {str(e)}")
+            if "timed out" in str(e).lower():
+                print("❌ Hết thời gian. Hãy nói câu trả lời.")
+            else:
+                print(f"❌ Lỗi microphone: {str(e)}")
+            return None
             return None
 
 
@@ -307,7 +321,7 @@ class VoiceQuizManager:
         self.voice_manager = VoiceManager()
         self.results = []
     
-    def ask_question_voice(self, question_text: str, language: str = "en", repeat: int = 2) -> Optional[str]:
+    def ask_question_voice(self, question_text: str, language: str = "en", repeat: int = 2, quiz_type: str = "meaning") -> Optional[str]:
         """
         Hỏi câu hỏi bằng giọng nói (lặp lại) + tự động lắng nghe trả lời
         
@@ -315,6 +329,7 @@ class VoiceQuizManager:
             question_text: Nội dung câu hỏi
             language: Ngôn ngữ ("en", "vi", "zh", "ja")
             repeat: Số lần đọc câu hỏi
+            quiz_type: Loại quiz ("meaning", "example", "vietnamese") để điều chỉnh thời gian lắng nghe
         
         Returns: Câu trả lời của người dùng hoặc None
         """
@@ -330,30 +345,30 @@ class VoiceQuizManager:
         
         # 2. Tự động lắng nghe trả lời
         print("\n▶️ Tự động lắng nghe trả lời...")
-        answer = self.voice_manager.listen_to_microphone(timeout=10, language='en-US')
+        answer = self.voice_manager.listen_to_microphone(timeout=10, language='en-US', quiz_type=quiz_type)
         
         return answer
     
-    def compare_answers(self, user_answer: str, correct_answer: str) -> Tuple[bool, float, str]:
+    def compare_answers(self, user_answer: str, correct_answer: str) -> Tuple[bool, float, str, bool]:
         """
         So sánh câu trả lời của người dùng với câu trả lời đúng
         Dùng Scorer từ app cho consistent comparison
-        Returns: (is_correct, similarity_score, feedback)
+        Returns: (is_correct, similarity_score, feedback, is_semantic)
         """
         if not user_answer:
-            return False, 0.0, "❌ Không có câu trả lời"
+            return False, 0.0, "❌ Không có câu trả lời", False
         
         # Import scorer để dùng logic consistent
         try:
             from scorer import Scorer
             scorer = Scorer()
-            score, feedback = scorer.calculate_score(user_answer, correct_answer, attempt=1)
+            score, feedback, is_semantic = scorer.calculate_score(user_answer, correct_answer, attempt=1)
             
             # Convert score to similarity (10 = 1.0, 0 = 0.0)
             similarity = score / 10.0
             is_correct = score >= 5  # Coi >= 5 là đúng
             
-            return is_correct, similarity, feedback
+            return is_correct, similarity, feedback, is_semantic
         except ImportError:
             # Fallback nếu không có scorer
             print("⚠️ Scorer not found, using fallback comparison")
@@ -374,16 +389,16 @@ class VoiceQuizManager:
             correct_normalized = normalize_text(correct_answer)
             
             if user_normalized == correct_normalized:
-                return True, 1.0, "✅ Hoàn hảo!"
+                return True, 1.0, "✅ Hoàn hảo!", False
             
             # Fallback simple check
             matcher = SequenceMatcher(None, user_normalized, correct_normalized)
             similarity = matcher.ratio()
             
             if similarity >= 0.95:
-                return True, similarity, f"✔️ Gần đúng ({similarity*100:.0f}%)"
+                return True, similarity, f"✔️ Gần đúng ({similarity*100:.0f}%)", False
             
-            return False, similarity, f"❌ Sai. Trả lời đúng là: {correct_answer}"
+            return False, similarity, f"❌ Sai. Trả lời đúng là: {correct_answer}", False
 
 
 # Test

@@ -1,0 +1,129 @@
+📝 TIMER FEATURE FOR TEXT QUIZ - IMPLEMENTATION COMPLETE
+
+✅ FEATURES ADDED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ Timer display (top-right corner)
+✓ Different time limits per quiz type:
+  • Nghĩa từ (meaning): 60 giây
+  • Dịch câu (example): 120 giây
+  • VN-EN (vietnamese): 120 giây
+
+✓ Auto-color change:
+  • Black: > 60s remaining
+  • Orange: 30-60s remaining  
+  • Red: < 30s remaining
+
+✓ Auto-submit when time runs out
+✓ Cancel timer on submit/next question
+
+
+🔧 TECHNICAL IMPLEMENTATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Modified _create_quiz_tab():
+   └─ Added timer_label display
+   └─ Initialize timer_remaining = 0
+   └─ Initialize timer_id = None
+
+2. Enhanced display_question():
+   └─ Set time_limit based on quiz_type_str
+   └─ Start countdown with _update_timer()
+   └─ Cancel previous timer if running
+
+3. New function _update_timer():
+   └─ Update display every 1s
+   └─ Change color based on time
+   └─ Auto-submit or move next when time = 0
+
+4. Enhanced submit_answer():
+   └─ Cancel timer before processing
+   └─ Clear timer display
+
+
+📊 TIME ALLOCATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Mode: "Nghĩa từ" (Word Meaning)
+├─ Thời gian: 60 giây
+├─ Tính năng: Nhanh, là từ đơn
+└─ Độ khó: Dễ nhất
+
+Mode: "Dịch câu" (Example Translation)
+├─ Thời gian: 120 giây (TĂNG)
+├─ Tính năng: Câu dài, cần suy nghĩ
+└─ Độ khó: Khó, cần thêm time
+
+Mode: "VN-EN" (Vietnamese to English)
+├─ Thời gian: 120 giây (TĂNG)
+├─ Tính năng: Dịch từ Việt, câu dài
+└─ Độ khó: Khó, cần thêm time
+
+
+🎨 UI UPDATES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Progress bar:    [Câu 2/10 (Lần 1/3)]     [⏱️ 120s]
+                 └─ Progress info         └─ Timer on right
+
+
+📝 BEHAVIOR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When question displays:
+  ✓ Timer starts countdown
+  ✓ Display changes color gradually
+  ✓ User can submit early (cancel timer)
+
+When time runs out:
+  ✓ If user typed answer → auto-submit
+  ✓ If no answer → mark wrong, next question
+  ✓ Show "HẾT GIỜ!" message
+
+When user submits:
+  ✓ Timer cancels immediately
+  ✓ No more countdown
+  ✓ Next question resets timer
+
+
+✅ VERIFICATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Checked in gui_main_v2_new.py:
+  ✓ timer_remaining initialized (line ~60)
+  ✓ timer_id initialized (line ~61)
+  ✓ timer_label added to UI
+  ✓ _update_timer() function created
+  ✓ Timer logic in display_question()
+  ✓ Timer cancellation in submit_answer()
+
+
+🚀 USAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Run GUI:
+  python gui_main_v2_new.py
+
+Select quiz type:
+  • Nghĩa từ → 60s timer
+  • Dịch câu → 120s timer
+  • VN-EN → 120s timer
+
+Features:
+  ✓ Type answer within time
+  ✓ Submit early if confident
+  ✓ Auto-submit if time runs out
+  ✓ See timer countdown in top-right
+
+
+💡 BENEFITS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ Fair time allocation (60/120s per type)
+✓ Long sentences get more time
+✓ Visual feedback (color change)
+✓ Auto-submit prevents hanging
+✓ Better time management practice
+
+
+STATUS: ✅ COMPLETE & WORKING
