@@ -8,3 +8,12 @@ gtts>=2.2.4  # Google Text-to-Speech (Online, better quality)
 SpeechRecognition>=3.10.0  # Speech-to-Text (Google)
 pyaudio>=0.2.11  # Microphone support (optional, for advanced features)
 pygame>=2.1.0  # Audio playback (alternative to system audio)
+
+# Discord Integration
+requests>=2.28.0  # HTTP requests for Discord webhook
+
+# Camera Support
+opencv-python>=4.5.0  # Camera capture for Discord photo submission
+
+# Environment Variables
+python-dotenv>=0.19.0  # Load .env file for sensitive data
