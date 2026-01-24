@@ -1010,6 +1010,54 @@ class LanguageQuizGUI:
                   command=lambda: open_sample_file("Chinese"), width=12).pack(side=tk.LEFT, padx=2)
         ttk.Button(button_frame, text="🇯🇵 Japanese", 
                   command=lambda: open_sample_file("Japanese"), width=12).pack(side=tk.LEFT, padx=2)
+        
+        # Add documentation links section
+        doc_frame = ttk.Frame(guide_container)
+        doc_frame.pack(fill=tk.X, pady=(15, 0))
+        
+        ttk.Label(doc_frame, text="📚 Tài liệu hướng dẫn:", font=("Segoe UI", 10, "bold")).pack(anchor=tk.W, pady=(0, 5))
+        
+        def open_doc_file(filename):
+            """Open documentation file"""
+            file_path = Path(__file__).parent / filename
+            if file_path.exists():
+                import os
+                os.startfile(file_path)
+            else:
+                messagebox.showwarning("Không tìm thấy", f"File {filename} không tồn tại!")
+        
+        # Row 1: Main docs
+        doc_row1 = ttk.Frame(doc_frame)
+        doc_row1.pack(fill=tk.X, pady=2)
+        
+        ttk.Button(doc_row1, text="📖 README", 
+                  command=lambda: open_doc_file("README.md"), width=18).pack(side=tk.LEFT, padx=2)
+        ttk.Button(doc_row1, text="🚀 QUICK START", 
+                  command=lambda: open_doc_file("QUICK_START.txt"), width=18).pack(side=tk.LEFT, padx=2)
+        ttk.Button(doc_row1, text="❓ FAQ", 
+                  command=lambda: open_doc_file("FAQ.txt"), width=18).pack(side=tk.LEFT, padx=2)
+        
+        # Row 2: Detailed guides
+        doc_row2 = ttk.Frame(doc_frame)
+        doc_row2.pack(fill=tk.X, pady=2)
+        
+        ttk.Button(doc_row2, text="📋 Excel Guide", 
+                  command=lambda: open_doc_file("EXCEL_GUIDE.txt"), width=18).pack(side=tk.LEFT, padx=2)
+        ttk.Button(doc_row2, text="🎙️ Voice Guide", 
+                  command=lambda: open_doc_file("VOICE_QUIZ_GUIDE.txt"), width=18).pack(side=tk.LEFT, padx=2)
+        ttk.Button(doc_row2, text="🔧 Setup Guide", 
+                  command=lambda: open_doc_file("SETUP_GUIDE.md"), width=18).pack(side=tk.LEFT, padx=2)
+        
+        # Row 3: Advanced features
+        doc_row3 = ttk.Frame(doc_frame)
+        doc_row3.pack(fill=tk.X, pady=2)
+        
+        ttk.Button(doc_row3, text="🔄 File Converter", 
+                  command=lambda: open_doc_file("FILE_CONVERTER_GUIDE.md"), width=18).pack(side=tk.LEFT, padx=2)
+        ttk.Button(doc_row3, text="💬 Discord Setup", 
+                  command=lambda: open_doc_file("DISCORD_SETUP.md"), width=18).pack(side=tk.LEFT, padx=2)
+        ttk.Button(doc_row3, text="📝 Release Notes", 
+                  command=lambda: open_doc_file("RELEASE_NOTES_v2.2.3.md"), width=18).pack(side=tk.LEFT, padx=2)
 
     
     # ===== METHODS =====
@@ -1597,10 +1645,10 @@ class LanguageQuizGUI:
                     self.instruction_shown = True
                 
                 # Đọc nội dung câu (không hướng dẫn)
+                # Mode 1: Câu hỏi luôn là tiếng Việt, nên dùng voice 'vi'
                 print(f"📢 [Mode 1] Đọc câu hỏi VN: {meaning_part[:60]}...")
                 self._start_gif_animation()  # 🎨 Bắt đầu animate
-                bot_lang = self._get_bot_language_code()
-                self.voice_manager.voice_manager.speak_google_tts(meaning_part, language=bot_lang)
+                self.voice_manager.voice_manager.speak_google_tts(meaning_part, language='vi')
                 self._stop_gif_animation()  # 🎨 Dừng animate
                 time.sleep(0.3)
             
@@ -2617,6 +2665,19 @@ class LanguageQuizGUI:
         user_name = self.quiz_results[0].get("user_name", "Unknown")
         timestamp = self.quiz_results[0].get("timestamp", "")
         
+        # 📝 Xác định loại bài kiểm tra
+        quiz_lang = self._get_quiz_language_code()
+        if self.test_mode == 1:
+            if self.quiz_type_str == "meaning":
+                test_type = f"Kiểm tra từ vựng - dịch sang {quiz_lang}"
+            else:
+                test_type = f"Kiểm tra câu - dịch sang {quiz_lang}"
+        else:  # mode 2
+            if self.quiz_type_str == "meaning":
+                test_type = "Kiểm tra từ vựng - dịch sang tiếng Việt"
+            else:
+                test_type = "Kiểm tra câu - dịch sang tiếng Việt"
+        
         total_points = sum(r.get("score", 0) for r in self.quiz_results)
         num_questions = len(self.quiz_results)
         avg_score = (total_points / (num_questions * 10)) * 100 if num_questions > 0 else 0
@@ -2639,6 +2700,7 @@ class LanguageQuizGUI:
 
 👤 Học sinh: {user_name}
 🕐 Thời gian: {timestamp}
+📝 Loại bài: {test_type}
 
 📈 TỔNG HỢP:
    Điểm trung bình: {avg_score:.1f}/100
@@ -2771,6 +2833,19 @@ class LanguageQuizGUI:
             start_q = self.start_question_var.get()
             end_q = self.end_question_var.get()
             
+            # 📝 Xác định loại bài kiểm tra
+            quiz_lang = self._get_quiz_language_code()
+            if self.test_mode == 1:
+                if self.quiz_type_str == "meaning":
+                    test_type = f"Kiểm tra từ vựng - dịch sang {quiz_lang}"
+                else:
+                    test_type = f"Kiểm tra câu - dịch sang {quiz_lang}"
+            else:  # mode 2
+                if self.quiz_type_str == "meaning":
+                    test_type = "Kiểm tra từ vựng - dịch sang tiếng Việt"
+                else:
+                    test_type = "Kiểm tra câu - dịch sang tiếng Việt"
+            
             # Tạo nội dung message
             message_content = f"""
 📊 **KẾT QUẢ KIỂM TRA**
@@ -2779,6 +2854,7 @@ class LanguageQuizGUI:
 🕐 **Thời gian:** {timestamp}
 📁 **File:** {file_name}
 📝 **Phạm vi:** từ câu {start_q} đến câu {end_q}
+✍️ **Loại bài:** {test_type}
 
 📈 **TỔNG HỢP:**
    • Điểm trung bình: **{avg_score:.1f}/100**
