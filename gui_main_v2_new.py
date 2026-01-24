@@ -323,11 +323,29 @@ class LanguageQuizGUI:
         quiz_frame = ttk.LabelFrame(left_col, text="⚙️ Cài đặt Quiz", padding=10)
         quiz_frame.pack(fill=tk.X, pady=(0, 10))  # Không expand để không chiếm hết chỗ
         
-        # Quiz type
+        # Quiz type với thời gian
         ttk.Label(quiz_frame, text="Loại:", font=("Segoe UI", 9, "bold")).pack(anchor=tk.W)
         self.quiz_type_var = tk.StringVar(value="meaning")
+        
+        # Thời gian cho từng loại quiz (mặc định: Nghĩa từ-4s, Dịch câu-12s, VN→EN-12s)
+        self.time_limits = {
+            "meaning": tk.IntVar(value=4),
+            "example": tk.IntVar(value=12),
+            "vietnamese": tk.IntVar(value=12)
+        }
+        
+        # Radio buttons với combobox thời gian
         for text, value in [("Nghĩa từ", "meaning"), ("Dịch câu", "example"), ("VN→EN", "vietnamese")]:
-            ttk.Radiobutton(quiz_frame, text=text, variable=self.quiz_type_var, value=value).pack(anchor=tk.W, pady=1)
+            row_frame = ttk.Frame(quiz_frame)
+            row_frame.pack(fill=tk.X, pady=1)
+            
+            ttk.Radiobutton(row_frame, text=text, variable=self.quiz_type_var, value=value).pack(side=tk.LEFT)
+            
+            ttk.Label(row_frame, text="⏱️", font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(10,2))
+            time_combo = ttk.Combobox(row_frame, textvariable=self.time_limits[value], 
+                                     values=[2,4,6,8,10,12,15,20,30], width=4, state="normal")
+            time_combo.pack(side=tk.LEFT, padx=2)
+            ttk.Label(row_frame, text="giây", font=("Segoe UI", 8), foreground="gray").pack(side=tk.LEFT, padx=2)
         
         ttk.Separator(quiz_frame, orient='horizontal').pack(fill=tk.X, pady=8)
         
@@ -485,6 +503,11 @@ class LanguageQuizGUI:
                                                              bg="#f9f9f9", relief=tk.FLAT)
         self.voice_question_text.pack(fill=tk.BOTH, expand=True)
         self.voice_question_text.config(state=tk.DISABLED)
+        
+        # ⏱️ Countdown timer (số to)
+        self.countdown_label = tk.Label(left_frame, text="", font=("Arial", 48, "bold"), 
+                                       fg="#e74c3c", bg="#f9f9f9")
+        self.countdown_label.pack(pady=10)
         
         # 🎨 GIF Nhân vật động dưới câu hỏi
         gif_frame = ttk.Frame(left_frame)
@@ -1055,29 +1078,54 @@ class LanguageQuizGUI:
         quiz_mode = self.quiz_mode_var.get()
         
         if quiz_mode == "practice":
-            # Practice Mode: Load weak words from database
+            # Practice Mode: Load weak words from database (ALL languages)
             try:
-                language = self._detect_language_from_file(Path(self.selected_file).name)
-                weak_words = self.study_db.get_weak_words(language)
+                # Lấy tất cả từ yếu từ database (không phân biệt ngôn ngữ)
+                all_weak_words = []
+                for lang in ["English", "Japanese", "Chinese", "Vietnamese"]:
+                    weak_words = self.study_db.get_weak_words(lang)
+                    all_weak_words.extend(weak_words)
                 
-                if not weak_words:
-                    messagebox.showinfo("Thông báo", f"✅ Tuyệt vời!\n\nKhông có từ nào cần ôn tập trong {language}.\n\nTất cả từ đều đã học tốt! 🎉")
+                if not all_weak_words:
+                    messagebox.showinfo("Thông báo", 
+                        "✅ Tuyệt vời!\n\n"
+                        "Không có từ nào cần ôn tập.\n\n"
+                        "Tất cả từ đều đã học tốt! 🎉\n\n"
+                        "💡 Mẹo: Hãy thử chế độ Normal để học từ mới.")
                     return
                 
                 # Convert weak words to quiz format
                 selected_data = []
-                for weak_word_dict in weak_words:
+                for weak_word_dict in all_weak_words:
                     # Format: {"word": word_text, "meaning": meaning, "language": lang, "wrong_count": X, "last_reviewed": timestamp}
                     selected_data.append({
                         "word": weak_word_dict["word"],
-                        "meaning": f"[{weak_word_dict['wrong_count']}x sai] {weak_word_dict['word']}",  # Show mistake count
+                        "meaning": weak_word_dict.get("meaning", ""),
+                        "example_en": weak_word_dict.get("example_en", ""),
+                        "example_vi": weak_word_dict.get("example_vi", ""),
                         "language": weak_word_dict["language"],
                         "wrong_count": weak_word_dict["wrong_count"],
                         "last_reviewed": weak_word_dict["last_reviewed"],
-                        "word_id": weak_word_dict["word_id"]
+                        "word_id": weak_word_dict.get("word_id", ""),
+                        "excel_row": 0  # Practice mode không có row trong Excel
                     })
                 
                 num_questions = len(selected_data)
+                
+                # Thống kê theo ngôn ngữ
+                lang_stats = {}
+                for word in selected_data:
+                    lang = word["language"]
+                    lang_stats[lang] = lang_stats.get(lang, 0) + 1
+                
+                stats_text = ", ".join([f"{lang}: {count}" for lang, count in lang_stats.items()])
+                
+                messagebox.showinfo("Chế độ Ôn tập", 
+                    f"🎯 CHẾ ĐỘ PRACTICE\n\n"
+                    f"📚 Tổng số từ yếu: {num_questions}\n\n"
+                    f"🌐 Phân bố:\n{stats_text}\n\n"
+                    f"💡 Hãy cố gắng trả lời đúng để cải thiện!")
+                
                 mode_text = f"🎯 Ôn tập từ yếu: {num_questions} từ cần học lại"
                 
             except Exception as e:
@@ -1362,10 +1410,16 @@ class LanguageQuizGUI:
                     self.voice_manager.voice_manager.speak_google_tts(foreign_part, language=tts_lang)
                 time.sleep(0.5)
             
-            # Bỏ đếm ngược - Đọc xong câu hỏi → có thể trả lời ngay
-            print("\n▶️ Sẵn sàng trả lời!")
-            self._safe_update_answer("🎤 Sẵn sàng! Hãy nói ngay...")
-            time.sleep(0.3)
+            # ✨ Phát âm thanh "tút" - báo hiệu bắt đầu ngay
+            try:
+                import winsound
+                winsound.Beep(1000, 200)  # 1000Hz, 200ms
+            except:
+                pass
+            
+            print("\n▶️ Sẵn sàng! Hãy nói NGAY!")
+            self._safe_update_answer("🎤 NÓI NGAY! 🔴")
+            time.sleep(0.2)
             
             # 🚀 Kiểm tra lại quiz vẫn đang chạy
             if not self.quiz_active:
@@ -1375,8 +1429,14 @@ class LanguageQuizGUI:
             # Lắng nghe (ưu tiên theo ngôn ngữ test)
             print(f"\n▶️ Lắng nghe câu trả lời ({language_stt})...")
             
-            # Update mic status - GIẢ animation (vì listen là blocking)
+            # Update mic status
             self.root.after(0, lambda: self.mic_status_label.config(text="🎙️ Đang nghe... NÓI TO VÀO MIC!", foreground="red"))
+            
+            # Lấy timeout từ combobox
+            quiz_type = self.quiz_type_var.get()
+            listen_timeout = self.time_limits[quiz_type].get()
+            
+            print(f"⏱️ Thời gian trả lời: {listen_timeout} giây")
             
             # Lấy microphone index từ combo (dùng mapping)
             mic_device_index = None
@@ -1387,29 +1447,42 @@ class LanguageQuizGUI:
             except:
                 mic_device_index = None
             
+            # ✨ Đếm ngược TRONG LÚC NGHE (thread riêng)
+            def countdown_during_listening():
+                for i in range(listen_timeout, 0, -1):
+                    if not self.quiz_active:
+                        return
+                    self.root.after(0, lambda sec=i: self.countdown_label.config(text=str(sec)))
+                    time.sleep(1)
+                # Xóa countdown khi hết giờ
+                self.root.after(0, lambda: self.countdown_label.config(text=""))
+            
+            Thread(target=countdown_during_listening, daemon=True).start()
+            
             # Animate bar trong background thread
             def animate_mic_bar():
-                for _ in range(30):  # 15s / 0.5s = 30
-                    if not self.app_running:  # Kiểm tra app còn chạy không
+                for _ in range(listen_timeout * 2):  # Chạy theo timeout
+                    if not self.app_running:
                         break
                     level = random.randint(20, 80)
                     try:
                         self.root.after(0, lambda l=level: self.mic_level_bar.config(value=l))
                     except RuntimeError:
-                        break  # Main loop đã dừng
+                        break
                     time.sleep(0.5)
             
             Thread(target=animate_mic_bar, daemon=True).start()
             
             user_answer = self.voice_manager.voice_manager.listen_to_microphone(
-                timeout=15, 
+                timeout=listen_timeout,  # ✨ Dùng thời gian từ combobox
                 language=language_stt,
-                quiz_type=self.quiz_type_str  # "meaning", "example", hoặc "vietnamese"
+                quiz_type=self.quiz_type_str
             )
             
-            # Reset mic status
+            # Reset mic status và xóa countdown
             self.root.after(0, lambda: self.mic_status_label.config(text="🎙️ Sẵn sàng", foreground="gray"))
             self.root.after(0, lambda: self.mic_level_bar.config(value=0))
+            self.root.after(0, lambda: self.countdown_label.config(text=""))
             
             if not user_answer:
                 self._safe_show_feedback("❌ Không nhận dạng được. Hãy nói lại!")
