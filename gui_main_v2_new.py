@@ -28,7 +28,7 @@ class LanguageQuizGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("🎓 Language Quiz v2.2 - Multi-Language Voice -Kiểm tra đa ngôn ngữ 0986183806")
-        self.root.geometry("950x750")
+        self.root.geometry("1100x800")
         self.root.resizable(True, True)
         
         # 🎨 Set icon cho app
@@ -102,6 +102,11 @@ class LanguageQuizGUI:
         self.results_tab = ttk.Frame(self.notebook)
         self.notebook.add(self.results_tab, text="📊 Kết quả")
         self._create_results_tab()
+        
+        # Tab Guide (luôn hiển thị)
+        self.guide_tab = ttk.Frame(self.notebook)
+        self.notebook.add(self.guide_tab, text="💡 Hướng dẫn")
+        self._create_guide_tab()
         
         # Xử lý khi đóng cửa sổ
         self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
@@ -350,22 +355,19 @@ class LanguageQuizGUI:
         
         ttk.Separator(quiz_frame, orient='horizontal').pack(fill=tk.X, pady=8)
         
-        # Range - Chọn từ câu nào đến câu nào
-        ttk.Label(quiz_frame, text="Phạm vi câu hỏi:", font=("Segoe UI", 9, "bold")).pack(anchor=tk.W)
-        range_frame = ttk.Frame(quiz_frame)
-        range_frame.pack(fill=tk.X, pady=5)
-        ttk.Label(range_frame, text="Từ:", font=("Segoe UI", 9)).pack(side=tk.LEFT)
-        self.start_question_var = tk.IntVar(value=1)
-        self.start_spin = ttk.Spinbox(range_frame, from_=1, to=1000, width=6, textvariable=self.start_question_var)
-        self.start_spin.pack(side=tk.LEFT, padx=3)
-        ttk.Label(range_frame, text="Đến:", font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(10,0))
-        self.end_question_var = tk.IntVar(value=10)
-        self.end_spin = ttk.Spinbox(range_frame, from_=1, to=1000, width=6, textvariable=self.end_question_var)
-        self.end_spin.pack(side=tk.LEFT, padx=3)
+        # Auto timing mode
+        ttk.Label(quiz_frame, text="⏱️ Chế độ thời gian:", font=("Segoe UI", 9, "bold")).pack(anchor=tk.W)
+        self.auto_timing_var = tk.BooleanVar(value=False)
+        timing_frame = ttk.Frame(quiz_frame)
+        timing_frame.pack(fill=tk.X, pady=5)
         
-        # Shuffle
-        self.shuffle_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(quiz_frame, text="🔀 Trộn câu hỏi", variable=self.shuffle_var).pack(anchor=tk.W, pady=3)
+        ttk.Radiobutton(timing_frame, text="📌 Thủ công (cố định)", 
+                       variable=self.auto_timing_var, value=False).pack(anchor=tk.W, pady=2)
+        ttk.Radiobutton(timing_frame, text="🤖 Tự động (theo độ dài câu)", 
+                       variable=self.auto_timing_var, value=True).pack(anchor=tk.W, pady=2)
+        
+        ttk.Label(quiz_frame, text="   💡 Auto: chatbot tính thời gian cho từng câu", 
+                 font=("Segoe UI", 8), foreground="gray").pack(anchor=tk.W)
         
         # RIGHT COLUMN - Voice Quiz (40% width)
         right_col = ttk.Frame(main_container)
@@ -430,6 +432,25 @@ class LanguageQuizGUI:
         ttk.Checkbutton(voice_frame, text="⚡ Phản hồi nhanh (chỉ text, bỏ TTS)", 
                        variable=self.faster_feedback_var).pack(anchor=tk.W, pady=5)
         
+        # Range - Chọn từ câu nào đến câu nào (di chuyển từ left column)
+        range_frame_container = ttk.LabelFrame(right_col, text="📝 Phạm vi câu hỏi", padding=10)
+        range_frame_container.pack(fill=tk.X, pady=(0, 10))
+        
+        range_frame = ttk.Frame(range_frame_container)
+        range_frame.pack(fill=tk.X)
+        ttk.Label(range_frame, text="Từ:", font=("Segoe UI", 9)).pack(side=tk.LEFT)
+        self.start_question_var = tk.IntVar(value=1)
+        self.start_spin = ttk.Spinbox(range_frame, from_=1, to=1000, width=6, textvariable=self.start_question_var)
+        self.start_spin.pack(side=tk.LEFT, padx=3)
+        ttk.Label(range_frame, text="Đến:", font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(10,0))
+        self.end_question_var = tk.IntVar(value=10)
+        self.end_spin = ttk.Spinbox(range_frame, from_=1, to=1000, width=6, textvariable=self.end_question_var)
+        self.end_spin.pack(side=tk.LEFT, padx=3)
+        
+        # Shuffle
+        self.shuffle_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(range_frame_container, text="🔀 Trộn câu hỏi", variable=self.shuffle_var).pack(anchor=tk.W, pady=(5,0))
+        
         # Start Buttons
         button_frame = ttk.LabelFrame(right_col, text="🚀 Bắt đầu", padding=15)
         button_frame.pack(fill=tk.X)
@@ -439,19 +460,15 @@ class LanguageQuizGUI:
         ttk.Button(button_frame, text="🎤 VOICE QUIZ", 
                   command=self.start_voice_quiz, width=25).pack(pady=5)
         
-        # Info
+        # Info - compact version at bottom
         info_frame = ttk.Frame(right_col)
-        info_frame.pack(fill=tk.BOTH, expand=True, pady=(10,0))
+        info_frame.pack(fill=tk.X, pady=(10,0))
         
-        info_text = tk.Text(info_frame, height=8, wrap=tk.WORD, font=("Segoe UI", 9), 
-                           bg="#f9f9f9", relief=tk.FLAT, padx=10, pady=10)
-        info_text.pack(fill=tk.BOTH, expand=True)
-        info_text.insert(tk.END, "💡 HƯỚNG DẪN:\n\n")
-        info_text.insert(tk.END, "1. Chọn file Excel và sheet\n")
-        info_text.insert(tk.END, "2. Test microphone trước khi bắt đầu\n")
-        info_text.insert(tk.END, "3. Chọn loại quiz và số câu\n")
-        info_text.insert(tk.END, "4. Bấm 'Voice Quiz' để bắt đầu\n\n")
-        info_text.insert(tk.END, "⚡ Nhận dạng giọng nói tức thì!")
+        info_text = tk.Text(info_frame, height=4, wrap=tk.WORD, font=("Segoe UI", 8), 
+                           bg="#f9f9f9", relief=tk.FLAT, padx=8, pady=8)
+        info_text.pack(fill=tk.X)
+        info_text.insert(tk.END, "💡 Chọn file Excel → Test mic → Chọn loại quiz → Voice Quiz\n")
+        info_text.insert(tk.END, "⚡ Auto timing: chatbot tự tính thời gian cho từng câu")
         info_text.config(state=tk.DISABLED)
     
     def _create_quiz_tab(self):
@@ -806,6 +823,193 @@ class LanguageQuizGUI:
         self.results_text = scrolledtext.ScrolledText(self.results_tab, font=("Arial", 10), wrap=tk.WORD)
         self.results_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         self.results_text.config(state=tk.DISABLED)
+    
+    def _create_guide_tab(self):
+        """⚡ Tab hướng dẫn chi tiết"""
+        # Create scrolled text for guide content
+        guide_container = ttk.Frame(self.guide_tab)
+        guide_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        
+        guide_text = scrolledtext.ScrolledText(
+            guide_container, 
+            wrap=tk.WORD, 
+            font=("Segoe UI", 10),
+            bg="#f9f9f9",
+            padx=20,
+            pady=20
+        )
+        guide_text.pack(fill=tk.BOTH, expand=True)
+        
+        # Guide content
+        content = """🎓 HƯỚNG DẪN SỬ DỤNG LANGUAGE QUIZ v2.2
+══════════════════════════════════════════════════════════════
+
+📝 CÁC BƯỚC CƠ BẢN:
+
+1️⃣ CHỌN FILE VÀ SHEET:
+   - Nhấn "Chon File Excel" để chọn file từ vựng của bạn
+   - Chọn sheet từ dropdown (ví dụ: "English", "Chinese H3p2", v.v.)
+   - File Excel cần có các cột: word, meaning, example_en, example_vi, example_zh
+
+2️⃣ KIỂM TRA MICROPHONE:
+   - Chọn microphone từ danh sách
+   - Nhấn "Test (5s)" để kiểm tra mic hoạt động
+   - Nói to vào mic, thanh xanh sẽ nén lên nếu mic hoạt động tốt
+
+3️⃣ CHỌN CẤU HÌNH QUIZ:
+
+   🎯 Loại câu hỏi:
+   • Nghĩa từ: Dịch từ vựng đơn (mặc định 4 giây)
+   • Dịch câu: Dịch câu hoàn chỉnh (mặc định 12 giây)
+   • VN→EN: Dịch từ tiếng Việt sang tiếng Anh
+
+   ⏱️ Chế độ thời gian:
+   • 📌 Thủ công: Thời gian cố định cho toàn bài (tùy chỉnh được)
+   • 🤖 Tự động: Chatbot tính thời gian cho từng câu dựa vào độ dài đáp án
+   
+   📝 Phạm vi câu hỏi:
+   • Từ câu: Bắt đầu từ câu số mấy (mặc định: 1)
+   • Đến câu: Kết thúc ở câu số mấy (mặc định: 10)
+   • 🔀 Trộn câu hỏi: Tạo thứ tự ngẫu nhiên
+
+4️⃣ CHỌN CHẾ ĐỘ VOICE QUIZ:
+
+   🎤 Mode 1: Bot đọc VN → User nói EN/CN/JP
+   - Chatbot đọc tiếng Việt
+   - Bạn trả lời bằng tiếng Anh/Trung/Nhật
+   
+   🎤 Mode 2: Bot đọc EN/CN/JP → User nói VN
+   - Chatbot đọc tiếng nước ngoài
+   - Bạn trả lời bằng tiếng Việt
+
+5️⃣ CHỌN GIỌNG ĐỌC & NGÔN NGỮ CHATBOT:
+
+   🔊 Giọng đọc:
+   • English: Nữ (Joanna) hoặc Nam (Matthew)
+   • 日本語: Nữ (Mizuki) hoặc Nam (Takumi)
+   
+   🤖 Ngôn ngữ Chatbot:
+   • Tiếng Việt: Hướng dẫn và phản hồi bằng tiếng Việt
+   • Tiếng Anh: Instructions and feedback in English
+   • Tiếng Trung: 中文说明和反馈
+   • Tiếng Nhật: 日本語での説明とフィードバック
+
+6️⃣ BẮT ĐẦU VOICE QUIZ:
+
+   • Nhấn nút "🎤 VOICE QUIZ"
+   • Chatbot sẽ:
+     1. Đọc hướng dẫn (1 lần, bằng ngôn ngữ chatbot đã chọn)
+     2. Đọc câu hỏi (tiếng Việt hoặc tiếng nước ngoài)
+     3. Phát beep sound để báo hiệu
+     4. Bắt đầu đếm ngược thời gian
+     5. Lắng nghe câu trả lời của bạn
+   
+   • NÓI TO VÀO MIC khi thấy số đếm ngược!
+   • Câu trả lời sẽ được hiển thị ngay sau khi nhận dạng
+
+⭐ TÍNH NĂNG ĐẶC BIỆT:
+
+🎯 Chế độ Quiz:
+   • 📖 Normal: Kiểm tra toàn bộ từ trong phạm vi đã chọn
+   • 🎯 Practice: Ôn tập từ yếu (dựa vào lịch sử làm bài)
+
+⚡ Phản hồi nhanh:
+   • Tích vào "Phản hồi nhanh (chỉ text, bỏ TTS)"
+   • Chỉ hiển thị text, không phát giọng nói phản hồi
+   • Tiết kiệm thời gian cho bài kiểm tra nhanh
+
+📊 Kết quả:
+   • Sau khi hoàn thành quiz, nhập tên để lưu kết quả
+   • Chatbot sẽ phát phản hồi theo điểm số:
+     - ≥ 90%: "Xuất sắc!" / "Excellent!" / "太棒了！" / "素晴らしい！"
+     - ≥ 75%: "Tốt lắm!" / "Good job!" / "很好！" / "良くできました！"
+     - ≥ 60%: "Khá đấy!" / "Not bad!" / "不错！" / "悪くないです！"
+     - < 60%: "Cần cố gắng hơn!" / "Need more effort!"
+   • Kết quả được lưu vào file JSON
+   • Ảnh từ camera (nếu có) sẽ được gửi lên Discord
+
+══════════════════════════════════════════════════════════════
+
+🔧 KHẮC PHỤC SỰ CỐ PHỔ BIẾN:
+
+❌ Microphone không hoạt động:
+   1. Kiểm tra kết nối microphone
+   2. Thử Test mic trước khi bắt đầu
+   3. Chọn microphone khác từ danh sách
+   4. Kiểm tra Windows Sound Settings
+
+❌ Không nhận dạng được giọng nói:
+   1. NÓI TO HƠN vào mic
+   2. Phát âm rõ ràng, từ từ
+   3. Giảm tiếng ồn xung quanh
+   4. Mic nên cách miệng 5-10cm
+
+❌ File Excel bị lỗi:
+   1. Đảm bảo file có các cột: word, meaning, example_en, example_vi
+   2. Không để dòng trống ở giữa dữ liệu
+   3. Lưu file dạng .xlsx (Excel 2007+)
+
+❌ Chatbot phát âm không chuẩn:
+   1. Đổi sang giọng AWS Polly (cho Anh/Trung/Nhật)
+   2. Chọn giọng nam hoặc nữ tùy thích
+   3. Kiểm tra kết nối internet (cho gTTS)
+
+══════════════════════════════════════════════════════════════
+
+� CẤU TRÚC FILE EXCEL MẪU:
+
+┌─────────┬─────────────┬──────────────────┬──────────────────┬──────────────────┐
+│ STT     │ word        │ meaning          │ example_en       │ example_vi       │
+├─────────┼─────────────┼──────────────────┼──────────────────┼──────────────────┤
+│ 1       │ hello       │ xin chào         │ Hello, how are   │ Xin chào, bạn    │
+│         │             │                  │ you?             │ khỏe không?      │
+├─────────┼─────────────┼──────────────────┼──────────────────┼──────────────────┤
+│ 2       │ thank you   │ cảm ơn           │ Thank you very   │ Cảm ơn bạn rất   │
+│         │             │                  │ much             │ nhiều            │
+├─────────┼─────────────┼──────────────────┼──────────────────┼──────────────────┤
+│ 3       │ goodbye     │ tạm biệt         │ Goodbye, see you │ Tạm biệt, hẹn    │
+│         │             │                  │ later            │ gặp lại          │
+└─────────┴─────────────┴──────────────────┴──────────────────┴──────────────────┘
+
+* Đối với tiếng Trung, thêm cột: example_zh
+* Đối với tiếng Nhật, thêm cột: example_ja
+
+══════════════════════════════════════════════════════════════
+
+📞 HỖ TRỢ: 0986183806
+✨ Chúc bạn học tập hiệu quả với Language Quiz!
+"""
+        
+        guide_text.insert("1.0", content)
+        guide_text.config(state=tk.DISABLED)
+        
+        # Add buttons for sample files at bottom
+        button_frame = ttk.Frame(guide_container)
+        button_frame.pack(fill=tk.X, pady=(10, 0))
+        
+        ttk.Label(button_frame, text="📁 File mẫu:", font=("Segoe UI", 10, "bold")).pack(side=tk.LEFT, padx=(0, 10))
+        
+        def open_sample_file(lang):
+            """Open sample file in Excel"""
+            sample_files = {
+                "English": "sample_english.xlsx",
+                "Chinese": "sample_chinese.xlsx",
+                "Japanese": "sample_japanese.xlsx"
+            }
+            file_path = Path(__file__).parent / sample_files.get(lang, "")
+            if file_path.exists():
+                import os
+                os.startfile(file_path)
+            else:
+                messagebox.showinfo("File mẫu", f"File mẫu {lang} chưa có.\nVui lòng tạo file theo cấu trúc bảng ở trên.")
+        
+        ttk.Button(button_frame, text="🇬🇧 English", 
+                  command=lambda: open_sample_file("English"), width=12).pack(side=tk.LEFT, padx=2)
+        ttk.Button(button_frame, text="🇨🇳 Chinese", 
+                  command=lambda: open_sample_file("Chinese"), width=12).pack(side=tk.LEFT, padx=2)
+        ttk.Button(button_frame, text="🇯🇵 Japanese", 
+                  command=lambda: open_sample_file("Japanese"), width=12).pack(side=tk.LEFT, padx=2)
+
     
     # ===== METHODS =====
     
@@ -1488,9 +1692,40 @@ class LanguageQuizGUI:
             # Update mic status
             self.root.after(0, lambda: self.mic_status_label.config(text="🎙️ Đang nghe... NÓI TO VÀO MIC!", foreground="red"))
             
-            # Lấy timeout từ combobox
+            # Xác định correct_answer TRƯỚC để tính auto timeout
+            question = self.quiz_engine.questions[self.current_question_idx]
+            
+            if self.test_mode == 1:
+                # Mode 1: Đọc VN → User trả lời foreign language
+                if self.quiz_type_str == "meaning":
+                    correct_answer = question.get("word")  # Từ vựng (EN/ZH/JA)
+                elif self.quiz_type_str == "example":
+                    # Ưa chọn field phù hợp: example_zh cho Chinese, example_en cho English
+                    quiz_lang = self._get_quiz_language_code()
+                    if quiz_lang == "Chinese":
+                        correct_answer = question.get("example_zh", question.get("example_en", ""))
+                    else:
+                        correct_answer = question.get("example_en", "")
+                else:  # vietnamese
+                    correct_answer = question.get("example_vi")  # Dịch câu VN (example_vi)
+            else:
+                # Mode 2: Đọc Foreign → User trả lời Vietnamese
+                if self.quiz_type_str == "meaning":
+                    correct_answer = question.get("meaning")  # Nghĩa tiếng Việt
+                elif self.quiz_type_str == "example":
+                    correct_answer = question.get("example_vi")  # Dịch câu VN
+                else:  # vietnamese
+                    correct_answer = question.get("example_vi")  # Dịch tiếng Việt
+            
+            # Lấy timeout: Auto hoặc Manual
             quiz_type = self.quiz_type_var.get()
-            listen_timeout = self.time_limits[quiz_type].get()
+            
+            if self.auto_timing_var.get():
+                # 🤖 Chế độ tự động: tính theo độ dài đáp án
+                listen_timeout = self._calculate_auto_timeout(correct_answer, quiz_type)
+            else:
+                # 📌 Chế độ thủ công: lấy từ combobox
+                listen_timeout = self.time_limits[quiz_type].get()
             
             print(f"⏱️ Thời gian trả lời: {listen_timeout} giây")
             
@@ -1549,28 +1784,7 @@ class LanguageQuizGUI:
             if not user_answer:
                 self._safe_show_feedback("❌ Không nhận dạng được. Hãy nói lại!")
                 
-                # Xác định correct_answer để lưu kết quả
-                question = self.quiz_engine.questions[self.current_question_idx]
-                if self.test_mode == 1:
-                    if self.quiz_type_str == "meaning":
-                        correct_answer = question.get("word")
-                    elif self.quiz_type_str == "example":
-                        quiz_lang = self._get_quiz_language_code()
-                        if quiz_lang == "Chinese":
-                            correct_answer = question.get("example_zh", question.get("example_en", ""))
-                        else:
-                            correct_answer = question.get("example_en", "")
-                    else:  # vietnamese
-                        correct_answer = question.get("example_vi")
-                else:  # Mode 2
-                    if self.quiz_type_str == "meaning":
-                        correct_answer = question.get("meaning")
-                    elif self.quiz_type_str == "example":
-                        correct_answer = question.get("example_vi")
-                    else:  # vietnamese
-                        correct_answer = question.get("example_vi")
-                
-                # Lưu kết quả với điểm 0
+                # Lưu kết quả với điểm 0 (correct_answer đã được xác định ở trên)
                 question_num = question.get("excel_row", self.current_question_idx + 1)
                 self.quiz_results.append({
                     "question_num": question_num,
@@ -1596,36 +1810,7 @@ class LanguageQuizGUI:
             # ✅ Instant transcription: Show recognized text immediately
             self._safe_update_answer(f"✅ Đã nhận dạng:\n\n{user_answer}")
             
-            # So sánh NGAY (bỏ sleep để nhanh hơn)
-            question = self.quiz_engine.questions[self.current_question_idx]
-            
-            # Xác định correct_answer theo Mode và quiz type
-            if self.test_mode == 1:
-                # Mode 1: Đọc VN → User trả lời foreign language
-                if self.quiz_type_str == "meaning":
-                    correct_answer = question.get("word")  # Từ vựng (EN/ZH/JA)
-                elif self.quiz_type_str == "example":
-                    # Ưa chọn field phù hợp: example_zh cho Chinese, example_en cho English
-                    quiz_lang = self._get_quiz_language_code()
-                    if quiz_lang == "Chinese":
-                        correct_answer = question.get("example_zh", question.get("example_en", ""))
-                    else:
-                        correct_answer = question.get("example_en", "")
-                else:  # vietnamese
-                    quiz_lang = self._get_quiz_language_code()
-                    if quiz_lang == "Chinese":
-                        correct_answer = question.get("example_zh", question.get("example_en", ""))
-                    else:
-                        correct_answer = question.get("example_en", "")
-            else:
-                # Mode 2: Đọc foreign language → User trả lời VN
-                if self.quiz_type_str == "meaning":
-                    correct_answer = question.get("meaning")  # Nghĩa tiếng Việt
-                elif self.quiz_type_str == "example":
-                    correct_answer = question.get("example_vi")  # Dịch tiếng Việt
-                else:  # vietnamese
-                    correct_answer = question.get("example_vi")  # Dịch tiếng Việt
-            
+            # So sánh NGAY (correct_answer đã được xác định ở trên)
             is_correct, similarity, _, is_semantic = self.voice_manager.compare_answers(user_answer, correct_answer)
             
             # Lưu kết quả
@@ -2049,6 +2234,40 @@ class LanguageQuizGUI:
         except Exception as e:
             self.test_mic_label.config(text=f"❌ Lỗi: {e}", foreground="red")
             print(f"❌ Test mic error: {e}")
+    
+    def _calculate_auto_timeout(self, correct_answer, quiz_type):
+        """
+        Tính toán thời gian trả lời tự động dựa trên độ dài đáp án
+        
+        Args:
+            correct_answer: Đáp án đúng
+            quiz_type: Loại quiz ("meaning", "example", "vietnamese")
+        
+        Returns:
+            int: Thời gian timeout (giây)
+        """
+        if not correct_answer:
+            return 5  # Default fallback
+        
+        # Đếm số từ và ký tự
+        word_count = len(correct_answer.split())
+        char_count = len(correct_answer)
+        
+        if quiz_type == "meaning":
+            # Nghĩa từ: thường ngắn (1-3 từ)
+            # Công thức: 1.5s/từ + 2s buffer
+            timeout = int(word_count * 1.5 + 2)
+            # Giới hạn: 3-10 giây
+            timeout = max(3, min(10, timeout))
+        else:
+            # Câu dài (example/vietnamese): thường 5-15 từ
+            # Công thức: 0.8s/từ + 2s buffer
+            timeout = int(word_count * 0.8 + 2)
+            # Giới hạn: 6-20 giây
+            timeout = max(6, min(20, timeout))
+        
+        print(f"🤖 Auto timeout: {word_count} từ ({char_count} ký tự) → {timeout}s")
+        return timeout
     
     # ===== GIF ANIMATION =====
     
