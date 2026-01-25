@@ -12,14 +12,10 @@ env_path = Path(__file__).parent / ".env"
 load_dotenv(env_path)
 
 # ========== AWS CREDENTIALS ==========
-# ⚠️ CẢNH BÁO: Đây là thông tin nhạy cảm!
-# Chỉ dùng trong môi trường phát triển/test
-# Không commit lên GitHub/public repository!
 # Lấy từ environment variables hoặc .env file
-
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "")
-AWS_REGION = "ap-southeast-2"
+AWS_REGION = os.getenv("AWS_REGION", "ap-southeast-2")
 
 # ========== POLLY VOICES ==========
 # Ánh xạ giữa ngôn ngữ và giọng người đọc

@@ -238,15 +238,22 @@ class LanguageQuizGUI:
         file_frame = ttk.LabelFrame(left_col, text="📁 File & Sheet", padding=10)
         file_frame.pack(fill=tk.X, pady=(0, 10))
         
-        ttk.Button(file_frame, text="Chọn File Excel", 
-                  command=self.select_excel_file, width=20).grid(row=0, column=0, padx=5, pady=3)
+        # Row 0: File button và Settings button
+        file_row = ttk.Frame(file_frame)
+        file_row.grid(row=0, column=0, columnspan=2, sticky=tk.EW, pady=3)
+        
+        ttk.Button(file_row, text="Chọn File Excel", 
+                  command=self.select_excel_file, width=20).pack(side=tk.LEFT, padx=(0, 5))
+        
+        ttk.Button(file_row, text="⚙️ Cài đặt API", 
+                  command=self.open_settings_dialog, width=15).pack(side=tk.LEFT)
         
         self.file_label = ttk.Label(file_frame, text="Chưa chọn", foreground="gray", font=("Segoe UI", 9))
-        self.file_label.grid(row=0, column=1, padx=5, sticky=tk.W)
+        self.file_label.grid(row=1, column=0, columnspan=2, padx=5, sticky=tk.W)
         
-        ttk.Label(file_frame, text="Sheet:", font=("Segoe UI", 9)).grid(row=1, column=0, sticky=tk.W, pady=(5,0))
+        ttk.Label(file_frame, text="Sheet:", font=("Segoe UI", 9)).grid(row=2, column=0, sticky=tk.W, pady=(5,0))
         self.sheet_combo = ttk.Combobox(file_frame, state="readonly", width=35)
-        self.sheet_combo.grid(row=2, column=0, columnspan=2, pady=3, sticky=tk.EW)
+        self.sheet_combo.grid(row=3, column=0, columnspan=2, pady=3, sticky=tk.EW)
         
         # Microphone Settings
         mic_frame = ttk.LabelFrame(left_col, text="🎙️ Microphone", padding=10)
@@ -826,9 +833,40 @@ class LanguageQuizGUI:
     
     def _create_guide_tab(self):
         """⚡ Tab hướng dẫn chi tiết"""
-        # Create scrolled text for guide content
-        guide_container = ttk.Frame(self.guide_tab)
-        guide_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        # Main container with logo on right
+        main_container = ttk.Frame(self.guide_tab)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        
+        # Right side - Logo
+        right_frame = ttk.Frame(main_container)
+        right_frame.pack(side=tk.RIGHT, padx=(20, 0))
+        
+        try:
+            logo_path = Path(__file__).parent / "logo.bmp"
+            if logo_path.exists():
+                from PIL import Image, ImageTk
+                logo_img = Image.open(logo_path)
+                # Resize to larger size for guide tab
+                logo_img = logo_img.resize((120, 120), Image.Resampling.LANCZOS)
+                logo_photo = ImageTk.PhotoImage(logo_img)
+                
+                logo_label = ttk.Label(right_frame, image=logo_photo)
+                logo_label.image = logo_photo  # Keep reference
+                logo_label.pack(pady=(10, 0))
+                
+                # App name below logo
+                app_name = ttk.Label(right_frame, 
+                                    text="Language Quiz\nv2.2", 
+                                    font=("Segoe UI", 11, "bold"),
+                                    justify=tk.CENTER,
+                                    foreground="#2c3e50")
+                app_name.pack(pady=(10, 0))
+        except Exception as e:
+            print(f"⚠️ Không load được logo: {e}")
+        
+        # Left side - Guide content
+        guide_container = ttk.Frame(main_container)
+        guide_container.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
         guide_text = scrolledtext.ScrolledText(
             guide_container, 
@@ -3097,6 +3135,169 @@ class LanguageQuizGUI:
         else:
             # Default based on first word
             return "Unknown"
+    
+    def open_settings_dialog(self):
+        """Mở dialog cài đặt API keys"""
+        from pathlib import Path
+        import os
+        
+        # Tạo dialog window
+        dialog = tk.Toplevel(self.root)
+        dialog.title("⚙️ Cài đặt API Keys")
+        dialog.geometry("650x550")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # Set icon if exists
+        try:
+            icon_path = Path(__file__).parent / "logo.ico"
+            if icon_path.exists():
+                dialog.iconbitmap(icon_path)
+        except:
+            pass
+        
+        # Center dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (650 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (550 // 2)
+        dialog.geometry(f"650x550+{x}+{y}")
+        
+        # Main frame
+        main_frame = ttk.Frame(dialog, padding=20)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Header with logo
+        header_frame = ttk.Frame(main_frame)
+        header_frame.pack(fill=tk.X, pady=(0, 15))
+        
+        # Try to load logo
+        try:
+            logo_path = Path(__file__).parent / "logo.bmp"
+            if logo_path.exists():
+                from PIL import Image, ImageTk
+                logo_img = Image.open(logo_path)
+                logo_img = logo_img.resize((48, 48), Image.Resampling.LANCZOS)
+                logo_photo = ImageTk.PhotoImage(logo_img)
+                
+                logo_label = ttk.Label(header_frame, image=logo_photo)
+                logo_label.image = logo_photo  # Keep reference
+                logo_label.pack(side=tk.LEFT, padx=(0, 10))
+        except Exception as e:
+            print(f"⚠️ Không load được logo: {e}")
+        
+        # Title
+        title_label = ttk.Label(header_frame, text="🔐 Cấu hình API Keys", 
+                               font=("Segoe UI", 14, "bold"))
+        title_label.pack(side=tk.LEFT)
+        
+        # Load current values from .env
+        env_path = Path(__file__).parent / ".env"
+        current_values = {}
+        
+        if env_path.exists():
+            with open(env_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, value = line.split('=', 1)
+                        current_values[key.strip()] = value.strip()
+        
+        # AWS Section
+        aws_frame = ttk.LabelFrame(main_frame, text="☁️ AWS Polly (Text-to-Speech)", padding=15)
+        aws_frame.pack(fill=tk.X, pady=(0, 15))
+        
+        ttk.Label(aws_frame, text="AWS Access Key ID:", font=("Segoe UI", 9)).pack(anchor=tk.W)
+        aws_key_entry = ttk.Entry(aws_frame, width=60, font=("Courier", 9))
+        aws_key_entry.insert(0, current_values.get("AWS_ACCESS_KEY_ID", ""))
+        aws_key_entry.pack(fill=tk.X, pady=(2, 10))
+        
+        ttk.Label(aws_frame, text="AWS Secret Access Key:", font=("Segoe UI", 9)).pack(anchor=tk.W)
+        aws_secret_entry = ttk.Entry(aws_frame, width=60, font=("Courier", 9), show="*")
+        aws_secret_entry.insert(0, current_values.get("AWS_SECRET_ACCESS_KEY", ""))
+        aws_secret_entry.pack(fill=tk.X, pady=(2, 10))
+        
+        ttk.Label(aws_frame, text="AWS Region:", font=("Segoe UI", 9)).pack(anchor=tk.W)
+        aws_region_entry = ttk.Entry(aws_frame, width=60)
+        aws_region_entry.insert(0, current_values.get("AWS_REGION", "ap-southeast-2"))
+        aws_region_entry.pack(fill=tk.X, pady=2)
+        
+        # Discord Section
+        discord_frame = ttk.LabelFrame(main_frame, text="💬 Discord Webhook", padding=15)
+        discord_frame.pack(fill=tk.X, pady=(0, 15))
+        
+        ttk.Label(discord_frame, text="Discord Webhook URL:", font=("Segoe UI", 9)).pack(anchor=tk.W)
+        discord_entry = ttk.Entry(discord_frame, width=60, font=("Courier", 9))
+        discord_entry.insert(0, current_values.get("DISCORD_WEBHOOK_URL", ""))
+        discord_entry.pack(fill=tk.X, pady=2)
+        
+        # Info label
+        info_label = ttk.Label(main_frame, 
+                              text="💡 Các thay đổi sẽ được lưu vào file .env và áp dụng ngay lập tức",
+                              font=("Segoe UI", 8),
+                              foreground="gray")
+        info_label.pack(pady=(10, 0))
+        
+        # Buttons
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(pady=(15, 0))
+        
+        def save_settings():
+            """Lưu settings vào .env file"""
+            try:
+                # Prepare new values
+                new_values = {
+                    "AWS_ACCESS_KEY_ID": aws_key_entry.get().strip(),
+                    "AWS_SECRET_ACCESS_KEY": aws_secret_entry.get().strip(),
+                    "AWS_REGION": aws_region_entry.get().strip(),
+                    "DISCORD_WEBHOOK_URL": discord_entry.get().strip()
+                }
+                
+                # Read existing .env or create new
+                env_lines = []
+                if env_path.exists():
+                    with open(env_path, 'r', encoding='utf-8') as f:
+                        env_lines = f.readlines()
+                
+                # Update or add keys
+                updated_keys = set()
+                new_env_lines = []
+                
+                for line in env_lines:
+                    stripped = line.strip()
+                    if stripped and not stripped.startswith('#') and '=' in stripped:
+                        key = stripped.split('=', 1)[0].strip()
+                        if key in new_values:
+                            new_env_lines.append(f"{key}={new_values[key]}\n")
+                            updated_keys.add(key)
+                        else:
+                            new_env_lines.append(line)
+                    else:
+                        new_env_lines.append(line)
+                
+                # Add new keys that weren't in file
+                for key, value in new_values.items():
+                    if key not in updated_keys:
+                        new_env_lines.append(f"{key}={value}\n")
+                
+                # Write back to file
+                with open(env_path, 'w', encoding='utf-8') as f:
+                    f.writelines(new_env_lines)
+                
+                # Reload environment variables
+                from dotenv import load_dotenv
+                load_dotenv(env_path, override=True)
+                
+                messagebox.showinfo("Thành công", 
+                                  "✅ Đã lưu cấu hình API keys!\n\n"
+                                  "Các thay đổi đã được áp dụng.",
+                                  parent=dialog)
+                dialog.destroy()
+                
+            except Exception as e:
+                messagebox.showerror("Lỗi", f"❌ Không thể lưu cấu hình:\n{e}", parent=dialog)
+        
+        ttk.Button(button_frame, text="💾 Lưu", command=save_settings, width=15).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="❌ Hủy", command=dialog.destroy, width=15).pack(side=tk.LEFT, padx=5)
     
     def _on_closing(self):
         """Xử lý khi đóng cửa sổ"""
