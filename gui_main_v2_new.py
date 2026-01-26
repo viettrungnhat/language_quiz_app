@@ -6642,16 +6642,19 @@ class LanguageQuizGUI:
         else:
             speak_text = current['example_en']  # Phát âm câu ví dụ
         
-        # Speak using Polly
-        voice = "Joanna" if self.pron_voice_var.get() == "female" else "Matthew"
-        
-        # Map language
+        # Map language code
         lang_map = {
             "English": "en",
             "Japanese": "ja",
             "Chinese": "zh"
         }
         language = lang_map.get(self.pron_language, "en")
+        
+        # Only use voice parameter for English (Joanna/Matthew)
+        # For Japanese/Chinese, let speak_with_polly use default voices (Mizuki/Zhiyu)
+        voice = None
+        if self.pron_language == "English":
+            voice = "Joanna" if self.pron_voice_var.get() == "female" else "Matthew"
         
         threading.Thread(
             target=lambda: self.voice_manager.voice_manager.speak_with_polly(speak_text, language=language, voice=voice),
