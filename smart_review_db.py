@@ -99,7 +99,7 @@ class SmartReviewDB:
         """)
         
         self.conn.commit()
-        print("✅ Smart Review Database initialized!")
+        print("[OK] Smart Review Database initialized!")
     
     # ===== SMART REVIEW METHODS =====
     
@@ -356,4 +356,4 @@ if __name__ == "__main__":
     print(f"📊 Mastery stats: {stats}")
     
     db.close()
-    print("\n✅ Test completed!")
+    print("\n[OK] Test completed!")

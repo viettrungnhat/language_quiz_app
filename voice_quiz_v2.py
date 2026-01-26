@@ -72,12 +72,12 @@ class VoiceManager:
                         aws_access_key_id=aws_key,
                         aws_secret_access_key=aws_secret
                     )
-                    print("✅ AWS Polly initialized successfully")
+                    print("[OK] AWS Polly initialized successfully")
                 else:
-                    print("⚠️ AWS credentials not found in .env - Polly disabled")
+                    print("[INFO] AWS credentials not found in .env - Polly disabled")
                     self.polly_available = False
             except Exception as e:
-                print(f"⚠️ AWS Polly init error: {e}")
+                print(f"[WARN] AWS Polly init error: {e}")
                 self.polly_available = False
         
         # Speech Recognition
@@ -86,8 +86,8 @@ class VoiceManager:
             # ⚠️ QUAN TRỌNG: Cố định energy_threshold (không auto-adjust)
             # Giảm energy_threshold để nhạy hơn (mặc định 300, tăng = kém nhạy hơn)
             self.recognizer.energy_threshold = 5  # Rất thấp = cực kỳ nhạy, sẽ nhận từ tiếng lẹo
-            self.recognizer.dynamic_energy_threshold = False  # ❌ KHÔNG auto-adjust
-            print(f"✅ STT Energy Threshold: {self.recognizer.energy_threshold} (ultra-sensitive)")
+            self.recognizer.dynamic_energy_threshold = False  # KHÔNG auto-adjust
+            print(f"[OK] STT Energy Threshold: {self.recognizer.energy_threshold} (ultra-sensitive)")
 
 
         
@@ -97,7 +97,7 @@ class VoiceManager:
             try:
                 pygame.mixer.init()
             except Exception as e:
-                print(f"⚠️ Pygame init error: {e}")
+                print(f"[WARN] Pygame init error: {e}")
                 self.pygame_available = False
     
     @staticmethod

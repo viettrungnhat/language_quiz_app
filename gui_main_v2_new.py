@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 f"""
 GUI VERSION 2.2 - Language Quiz with Enhanced Voice (v3)
 Giao diện đồ họa kiểm tra ngôn ngữ với Voice Quiz cải tiến
@@ -6,6 +7,10 @@ Giao diện đồ họa kiểm tra ngôn ngữ với Voice Quiz cải tiến
 - Đọc 2 lần + đếm ngược + tự động lắng nghe
 - Phát feedback bằng giọng nói (Đúng/Sai/Gần đúng)
 """
+
+# Suppress pygame deprecation warning
+import warnings
+warnings.filterwarnings("ignore", message=".*pkg_resources is deprecated.*")
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext, simpledialog
@@ -37,22 +42,22 @@ class LanguageQuizGUI:
             icon_path = Path(__file__).parent / "logo.ico"
             if icon_path.exists():
                 self.root.iconbitmap(str(icon_path))
-                print(f"✅ Đã set icon: {icon_path.name}")
+                print(f"Set icon: {icon_path.name}")
         except Exception as e:
-            print(f"⚠️ Không thể set icon: {e}")
+            print(f"Could not set icon: {e}")
         
         # Biến
         self.quiz_engine = None
         self.voice_manager = VoiceQuizManager()
         self.study_db = StudyHistoryDB()  # 🎓 Spaced repetition database
         
-        # 📚 Smart Review Database
+        # Smart Review Database
         try:
             from smart_review_db import SmartReviewDB
             self.smart_review_db = SmartReviewDB()
-            print("✅ Smart Review System initialized!")
+            print("[OK] Smart Review System initialized!")
         except Exception as e:
-            print(f"⚠️ Smart Review DB error: {e}")
+            print(f"[WARN] Smart Review DB error: {e}")
             self.smart_review_db = None
         
         self.selected_file = None
@@ -104,6 +109,11 @@ class LanguageQuizGUI:
         self.notebook.add(self.setup_tab, text="📋 Chuẩn bị")
         self._create_setup_tab()
         
+        # Tab 1.5: Pronunciation Practice (luôn hiển thị)
+        self.pronunciation_tab = ttk.Frame(self.notebook)
+        self.notebook.add(self.pronunciation_tab, text="🎤 Luyện phát âm")
+        self._create_pronunciation_tab()
+        
         # Tab 2: File Manager (luôn hiển thị)
         self.files_tab = ttk.Frame(self.notebook)
         self.notebook.add(self.files_tab, text="📚 Quản Lý File")
@@ -151,6 +161,7 @@ class LanguageQuizGUI:
         
         # 🚀 Flag để dừng thread quiz cũ khi bắt đầu quiz mới
         self.quiz_active = False
+        self.voice_quiz_stop_event = threading.Event()  # Event để báo hiệu dừng
         
         # Load file/sheet đã lưu
         self._load_previous_session()
@@ -181,12 +192,12 @@ class LanguageQuizGUI:
                 weight="bold"
             )
             
-            print("✅ Font chữ đã setup:")
+            print("[OK] Font char setup:")
             print(f"   - Latin: DejaVuSans")
             print(f"   - CJK: SamsungGothicKorean")
         
         except Exception as e:
-            print(f"⚠️ Lỗi setup font: {e}")
+            print(f"[WARN] Font setup error: {e}")
             # Fallback
             self.font_latin = tkFont.Font(size=11)
             self.font_cjk = tkFont.Font(size=11)
@@ -221,6 +232,87 @@ class LanguageQuizGUI:
                 json.dump(self.user_settings, f, indent=2, ensure_ascii=False)
         except Exception as e:
             print(f"⚠️ Không lưu được settings: {e}")
+    
+    def _load_recent_files(self):
+        """Load danh sách 5 file gần nhất vào combobox"""
+        try:
+            recent_files = self.user_settings.get("recent_files", [])
+            if recent_files:
+                # Chỉ hiển thị tên file (không full path)
+                display_names = []
+                for fp in recent_files:
+                    if Path(fp).exists():
+                        display_names.append(Path(fp).name)
+                
+                self.recent_files_combo['values'] = display_names
+                if display_names:
+                    self.recent_files_combo.current(0)
+            else:
+                self.recent_files_combo['values'] = ["(Chưa có file nào)"]
+        except Exception as e:
+            print(f"⚠️ Lỗi load recent files: {e}")
+    
+    def _add_to_recent_files(self, file_path):
+        """Thêm file vào danh sách recent files (giữ tối đa 5)"""
+        try:
+            recent_files = self.user_settings.get("recent_files", [])
+            
+            # Xóa nếu đã tồn tại (để đưa lên đầu)
+            if file_path in recent_files:
+                recent_files.remove(file_path)
+            
+            # Thêm vào đầu danh sách
+            recent_files.insert(0, file_path)
+            
+            # Giữ tối đa 5 file
+            recent_files = recent_files[:5]
+            
+            # Lưu lại
+            self.user_settings["recent_files"] = recent_files
+            self._save_settings()
+            
+            # Cập nhật combobox
+            self._load_recent_files()
+        except Exception as e:
+            print(f"⚠️ Lỗi add recent file: {e}")
+    
+    def _on_recent_file_selected(self, event):
+        """Xử lý khi user chọn file từ recent files"""
+        try:
+            selected_idx = self.recent_files_combo.current()
+            recent_files = self.user_settings.get("recent_files", [])
+            
+            if selected_idx >= 0 and selected_idx < len(recent_files):
+                file_path = recent_files[selected_idx]
+                
+                if Path(file_path).exists():
+                    self.selected_file = file_path
+                    self.file_label.config(text=f"✓ {Path(file_path).name}", foreground="green")
+                    
+                    # Load sheets
+                    wb = openpyxl.load_workbook(file_path, data_only=True)
+                    self.sheet_combo['values'] = wb.sheetnames
+                    
+                    # Tự động chọn sheet đầu tiên
+                    if wb.sheetnames:
+                        self.sheet_combo.current(0)
+                    
+                    # Lưu lại
+                    self.user_settings["last_file"] = file_path
+                    self._save_settings()
+                    
+                    print(f"✅ Đã chọn từ recent: {Path(file_path).name}")
+                else:
+                    messagebox.showwarning("File không tồn tại", 
+                        f"❌ File không còn tồn tại:\n{file_path}\n\n"
+                        "File sẽ bị xóa khỏi danh sách.")
+                    # Xóa file không tồn tại
+                    recent_files.remove(file_path)
+                    self.user_settings["recent_files"] = recent_files
+                    self._save_settings()
+                    self._load_recent_files()
+        except Exception as e:
+            print(f"⚠️ Lỗi chọn recent file: {e}")
     
     def _load_previous_session(self):
         """Load file and sheet from previous session"""
@@ -259,44 +351,73 @@ class LanguageQuizGUI:
             print(f"⚠️ Không load được session trước: {e}")
     
     def _create_setup_tab(self):
-        """Tab chuẩn bị - 2 COLUMN LAYOUT"""
+        """Tab chuẩn bị - COMPACT 2 COLUMN LAYOUT"""
         # Main container
         main_container = ttk.Frame(self.setup_tab)
-        main_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # LEFT COLUMN - Cài đặt (60% width)
+        # LEFT COLUMN - File & Settings (50% width)
         left_col = ttk.Frame(main_container)
-        left_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+        left_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
         
-        # File Selection
-        file_frame = ttk.LabelFrame(left_col, text="📁 File & Sheet", padding=10)
-        file_frame.pack(fill=tk.X, pady=(0, 10))
+        # ═══════════════════ FILE & SHEET (compact) ═══════════════════
+        file_frame = ttk.LabelFrame(left_col, text="📁 File & Sheet", padding=5)
+        file_frame.pack(fill=tk.X, pady=(0, 5))
         
-        # Row 0: File button và Settings button
-        file_row = ttk.Frame(file_frame)
-        file_row.grid(row=0, column=0, columnspan=2, sticky=tk.EW, pady=3)
+        # Row: Buttons
+        btn_row = ttk.Frame(file_frame)
+        btn_row.pack(fill=tk.X, pady=2)
+        ttk.Button(btn_row, text="Chọn File Excel", command=self.select_excel_file, width=18).pack(side=tk.LEFT, padx=(0, 3))
+        ttk.Button(btn_row, text="⚙️ Cài đặt API", command=self.open_settings_dialog, width=12).pack(side=tk.LEFT)
         
-        ttk.Button(file_row, text="Chọn File Excel", 
-                  command=self.select_excel_file, width=20).pack(side=tk.LEFT, padx=(0, 5))
+        self.file_label = ttk.Label(file_frame, text="Chưa chọn", foreground="gray", font=("Segoe UI", 8))
+        self.file_label.pack(anchor=tk.W, pady=1)
         
-        ttk.Button(file_row, text="⚙️ Cài đặt API", 
-                  command=self.open_settings_dialog, width=15).pack(side=tk.LEFT)
+        # Recent files + Sheet on same row
+        recent_sheet_row = ttk.Frame(file_frame)
+        recent_sheet_row.pack(fill=tk.X, pady=2)
         
-        self.file_label = ttk.Label(file_frame, text="Chưa chọn", foreground="gray", font=("Segoe UI", 9))
-        self.file_label.grid(row=1, column=0, columnspan=2, padx=5, sticky=tk.W)
+        ttk.Label(recent_sheet_row, text="📂 Gần đây:", font=("Segoe UI", 8)).pack(side=tk.LEFT)
+        self.recent_files_combo = ttk.Combobox(recent_sheet_row, state="readonly", width=25)
+        self.recent_files_combo.pack(side=tk.LEFT, padx=2)
+        self.recent_files_combo.bind("<<ComboboxSelected>>", self._on_recent_file_selected)
+        self._load_recent_files()
         
-        ttk.Label(file_frame, text="Sheet:", font=("Segoe UI", 9)).grid(row=2, column=0, sticky=tk.W, pady=(5,0))
-        self.sheet_combo = ttk.Combobox(file_frame, state="readonly", width=35)
-        self.sheet_combo.grid(row=3, column=0, columnspan=2, pady=3, sticky=tk.EW)
+        sheet_row = ttk.Frame(file_frame)
+        sheet_row.pack(fill=tk.X, pady=2)
+        ttk.Label(sheet_row, text="Sheet:", font=("Segoe UI", 8)).pack(side=tk.LEFT)
+        self.sheet_combo = ttk.Combobox(sheet_row, state="readonly", width=30)
+        self.sheet_combo.pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
         
-        # Microphone Settings
-        mic_frame = ttk.LabelFrame(left_col, text="🎙️ Microphone", padding=10)
-        mic_frame.pack(fill=tk.X, pady=(0, 10))
+        # ═══════════════════ MIC + CAMERA (compact, same row) ═══════════════════
+        device_frame = ttk.LabelFrame(left_col, text="🎙️ Microphone & 📷 Camera", padding=5)
+        device_frame.pack(fill=tk.X, pady=(0, 5))
         
-        self.mic_combo = ttk.Combobox(mic_frame, state="readonly", width=35)
-        self.mic_combo.pack(fill=tk.X, pady=(0, 5))
+        # Mic row
+        mic_row = ttk.Frame(device_frame)
+        mic_row.pack(fill=tk.X, pady=2)
+        ttk.Label(mic_row, text="Mic:", font=("Segoe UI", 8), width=6).pack(side=tk.LEFT)
+        self.mic_combo = ttk.Combobox(mic_row, state="readonly", width=28)
+        self.mic_combo.pack(side=tk.LEFT, padx=2)
         
-        # Load microphones
+        # 🎙️ Nút Test Mic đẹp
+        self.test_mic_btn = tk.Button(
+            mic_row, 
+            text="🎤 Test", 
+            command=self.test_microphone,
+            font=("Segoe UI", 9, "bold"),
+            bg="#4CAF50",  # Green
+            fg="white",
+            activebackground="#45a049",
+            activeforeground="white",
+            relief=tk.RAISED,
+            cursor="hand2",
+            padx=8,
+            pady=1
+        )
+        self.test_mic_btn.pack(side=tk.LEFT, padx=4)
+        
+        # Mic devices
         self.mic_device_indices = []
         try:
             from voice_quiz_v2 import VoiceManager
@@ -305,47 +426,47 @@ class LanguageQuizGUI:
             for idx, name in mics:
                 self.mic_device_indices.append(idx)
                 mic_names.append(f"{name}")
-            
             self.mic_combo['values'] = mic_names
             saved_mic_idx = self.user_settings.get("last_mic", 0)
             if saved_mic_idx < len(mic_names):
                 self.mic_combo.current(saved_mic_idx)
             elif mic_names:
                 self.mic_combo.current(0)
-        except Exception as e:
+        except:
             self.mic_combo['values'] = ["(Mặc định)"]
             self.mic_device_indices = [None]
             self.mic_combo.current(0)
         
-        # Test button
-        test_frame = ttk.Frame(mic_frame)
-        test_frame.pack(fill=tk.X)
+        # Mic test bar & label - HIỂN THỊ
+        self.test_mic_bar = ttk.Progressbar(device_frame, length=200, mode='determinate', maximum=100)
+        self.test_mic_bar.pack(fill=tk.X, pady=2)
         
-        ttk.Button(test_frame, text="🎙️ Test (5s)", command=self.test_microphone, width=12).pack(side=tk.LEFT)
-        self.test_mic_bar = ttk.Progressbar(test_frame, length=150, mode='determinate', maximum=100)
-        self.test_mic_bar.pack(side=tk.LEFT, padx=5)
-        self.test_mic_label = ttk.Label(test_frame, text="", foreground="gray", font=("Segoe UI", 8))
-        self.test_mic_label.pack(side=tk.LEFT)
+        self.test_mic_label = ttk.Label(device_frame, text="", foreground="gray", font=("Segoe UI", 7))
+        self.test_mic_label.pack(fill=tk.X, pady=(0, 3))
         
-        # Camera Settings (for Discord photo)
-        cam_frame = ttk.LabelFrame(left_col, text="📷 Camera (Discord)", padding=10)
-        cam_frame.pack(fill=tk.X, pady=(0, 10))
+        # Camera row
+        cam_row = ttk.Frame(device_frame)
+        cam_row.pack(fill=tk.X, pady=2)
+        ttk.Label(cam_row, text="Cam:", font=("Segoe UI", 8), width=6).pack(side=tk.LEFT)
+        self.camera_combo = ttk.Combobox(cam_row, state="readonly", width=28)
+        self.camera_combo.pack(side=tk.LEFT, padx=2)
+        ttk.Label(cam_row, text="(Discord)", font=("Segoe UI", 7), foreground="gray").pack(side=tk.LEFT)
         
-        self.camera_combo = ttk.Combobox(cam_frame, state="readonly", width=35)
-        self.camera_combo.pack(fill=tk.X, pady=(0, 5))
-        
-        # Load cameras
+        # Camera devices
         self.camera_indices = []
         try:
             import cv2
+            import os
+            # Suppress OpenCV camera errors
+            os.environ["OPENCV_LOG_LEVEL"] = "SILENT"
+            
             camera_names = []
-            for i in range(10):  # Check first 10 camera indices
-                cap = cv2.VideoCapture(i)
+            for i in range(5):
+                cap = cv2.VideoCapture(i, cv2.CAP_DSHOW)  # Use DirectShow to avoid obsensor errors
                 if cap.isOpened():
                     self.camera_indices.append(i)
                     camera_names.append(f"Camera {i}")
                     cap.release()
-            
             if camera_names:
                 self.camera_combo['values'] = camera_names
                 saved_cam_idx = self.user_settings.get("last_camera", 0)
@@ -354,204 +475,156 @@ class LanguageQuizGUI:
                 else:
                     self.camera_combo.current(0)
             else:
-                self.camera_combo['values'] = ["(Không có camera)"]
-                self.camera_indices = []
+                self.camera_combo['values'] = ["(Không có)"]
                 self.camera_combo.current(0)
-        except Exception as e:
-            print(f"⚠️ Lỗi load camera: {e}")
-            self.camera_combo['values'] = ["(Không có camera)"]
-            self.camera_indices = []
+        except:
+            self.camera_combo['values'] = ["(Không có)"]
             self.camera_combo.current(0)
         
-        ttk.Label(cam_frame, text="Ảnh sẽ được gửi kèm kết quả lên Discord", 
-                 font=("Segoe UI", 8), foreground="gray").pack(anchor=tk.W)
+        # ═══════════════════ QUIZ SETTINGS (compact) ═══════════════════
+        quiz_frame = ttk.LabelFrame(left_col, text="⚙️ Loại Quiz & Thời gian", padding=5)
+        quiz_frame.pack(fill=tk.X, pady=(0, 5))
         
-        # Quiz Settings
-        quiz_frame = ttk.LabelFrame(left_col, text="⚙️ Cài đặt Quiz", padding=10)
-        quiz_frame.pack(fill=tk.X, pady=(0, 10))  # Không expand để không chiếm hết chỗ
-        
-        # Quiz type với thời gian
-        ttk.Label(quiz_frame, text="Loại:", font=("Segoe UI", 9, "bold")).pack(anchor=tk.W)
         self.quiz_type_var = tk.StringVar(value="meaning")
-        
-        # Thời gian cho từng loại quiz (mặc định: Nghĩa từ-4s, Dịch câu-12s, VN→EN-12s)
         self.time_limits = {
             "meaning": tk.IntVar(value=4),
             "example": tk.IntVar(value=12),
             "vietnamese": tk.IntVar(value=12)
         }
         
-        # Radio buttons với combobox thời gian
+        # Quiz types in compact grid
         for text, value in [("Nghĩa từ", "meaning"), ("Dịch câu", "example"), ("VN→EN", "vietnamese")]:
-            row_frame = ttk.Frame(quiz_frame)
-            row_frame.pack(fill=tk.X, pady=1)
-            
-            ttk.Radiobutton(row_frame, text=text, variable=self.quiz_type_var, value=value).pack(side=tk.LEFT)
-            
-            ttk.Label(row_frame, text="⏱️", font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(10,2))
-            time_combo = ttk.Combobox(row_frame, textvariable=self.time_limits[value], 
-                                     values=[2,4,6,8,10,12,15,20,30], width=4, state="normal")
-            time_combo.pack(side=tk.LEFT, padx=2)
-            ttk.Label(row_frame, text="giây", font=("Segoe UI", 8), foreground="gray").pack(side=tk.LEFT, padx=2)
+            row = ttk.Frame(quiz_frame)
+            row.pack(fill=tk.X, pady=1)
+            ttk.Radiobutton(row, text=text, variable=self.quiz_type_var, value=value, width=10).pack(side=tk.LEFT)
+            ttk.Label(row, text="⏱️", font=("Segoe UI", 8)).pack(side=tk.LEFT, padx=2)
+            ttk.Combobox(row, textvariable=self.time_limits[value], values=[2,4,6,8,10,12,15,20,30], width=3).pack(side=tk.LEFT)
+            ttk.Label(row, text="s", font=("Segoe UI", 7), foreground="gray").pack(side=tk.LEFT)
         
-        ttk.Separator(quiz_frame, orient='horizontal').pack(fill=tk.X, pady=8)
-        
-        # Auto timing mode
-        ttk.Label(quiz_frame, text="⏱️ Chế độ thời gian:", font=("Segoe UI", 9, "bold")).pack(anchor=tk.W)
+        # Auto timing
         self.auto_timing_var = tk.BooleanVar(value=False)
-        timing_frame = ttk.Frame(quiz_frame)
-        timing_frame.pack(fill=tk.X, pady=5)
+        timing_row = ttk.Frame(quiz_frame)
+        timing_row.pack(fill=tk.X, pady=3)
+        ttk.Checkbutton(timing_row, text="🤖 Tự động tính thời gian", variable=self.auto_timing_var).pack(side=tk.LEFT)
         
-        ttk.Radiobutton(timing_frame, text="📌 Thủ công (cố định)", 
-                       variable=self.auto_timing_var, value=False).pack(anchor=tk.W, pady=2)
-        ttk.Radiobutton(timing_frame, text="🤖 Tự động (theo độ dài câu)", 
-                       variable=self.auto_timing_var, value=True).pack(anchor=tk.W, pady=2)
+        # ═══════════════════ PHẠM VI + TRỘN (compact) ═══════════════════
+        range_frame = ttk.LabelFrame(left_col, text="📝 Phạm vi câu hỏi", padding=5)
+        range_frame.pack(fill=tk.X, pady=(0, 5))
         
-        ttk.Label(quiz_frame, text="   💡 Auto: chatbot tính thời gian cho từng câu", 
-                 font=("Segoe UI", 8), foreground="gray").pack(anchor=tk.W)
-        
-        # RIGHT COLUMN - Voice Quiz (40% width)
-        right_col = ttk.Frame(main_container)
-        right_col.pack(side=tk.LEFT, fill=tk.BOTH, padx=(10, 0))
-        
-        # Voice Mode
-        mode_frame = ttk.LabelFrame(right_col, text="🎤 Chế độ Voice Quiz", padding=10)
-        mode_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        self.test_mode_var = tk.IntVar(value=1)
-        ttk.Radiobutton(mode_frame, text="Mode 1: Bot đọc VN → User nói EN/CN/JP", 
-                       variable=self.test_mode_var, value=1, command=self._on_test_mode_change).pack(anchor=tk.W, pady=3)
-        ttk.Radiobutton(mode_frame, text="Mode 2: Bot đọc EN/CN/JP → User nói VN", 
-                       variable=self.test_mode_var, value=2, command=self._on_test_mode_change).pack(anchor=tk.W, pady=3)
-        
-        # Voice Settings - Di chuyển từ left column
-        voice_frame = ttk.LabelFrame(right_col, text="🎙️ Giọng đọc & Tùy chọn", padding=10)
-        voice_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        # Ngôn ngữ Chatbot (hướng dẫn, phản hồi)
-        bot_lang_frame = ttk.Frame(voice_frame)
-        bot_lang_frame.pack(fill=tk.X, pady=(0, 8))
-        ttk.Label(bot_lang_frame, text="🤖 Chatbot:", font=("Segoe UI", 9, "bold"), width=10).pack(side=tk.LEFT)
-        self.bot_language_var = tk.StringVar(value="vi")
-        bot_lang_combo = ttk.Combobox(bot_lang_frame, textvariable=self.bot_language_var, 
-                                     values=["Tiếng Việt", "Tiếng Anh", "Tiếng Trung", "Tiếng Nhật"], 
-                                     state="readonly", width=15)
-        bot_lang_combo.pack(side=tk.LEFT, padx=3)
-        bot_lang_combo.current(0)  # Mặc định Tiếng Việt
-        ttk.Label(bot_lang_frame, text="(Hướng dẫn & phản hồi)", font=("Segoe UI", 8), foreground="gray").pack(side=tk.LEFT, padx=3)
-        
-        ttk.Separator(voice_frame, orient='horizontal').pack(fill=tk.X, pady=8)
-        
-        # English voice
-        en_voice_frame = ttk.Frame(voice_frame)
-        en_voice_frame.pack(fill=tk.X, pady=3)
-        ttk.Label(en_voice_frame, text="English:", font=("Segoe UI", 9), width=10).pack(side=tk.LEFT)
-        self.en_voice_var = tk.StringVar(value="female")
-        ttk.Radiobutton(en_voice_frame, text="👩 Nữ (Joanna)", variable=self.en_voice_var, value="female").pack(side=tk.LEFT, padx=3)
-        ttk.Radiobutton(en_voice_frame, text="👨 Nam (Matthew)", variable=self.en_voice_var, value="male").pack(side=tk.LEFT, padx=3)
-        
-        # Japanese voice
-        ja_voice_frame = ttk.Frame(voice_frame)
-        ja_voice_frame.pack(fill=tk.X, pady=3)
-        ttk.Label(ja_voice_frame, text="日本語:", font=("Segoe UI", 9), width=10).pack(side=tk.LEFT)
-        self.ja_voice_var = tk.StringVar(value="female")
-        ttk.Radiobutton(ja_voice_frame, text="👩 Nữ (Mizuki)", variable=self.ja_voice_var, value="female").pack(side=tk.LEFT, padx=3)
-        ttk.Radiobutton(ja_voice_frame, text="👨 Nam (Takumi)", variable=self.ja_voice_var, value="male").pack(side=tk.LEFT, padx=3)
-        
-        # Voice Speed Control
-        speed_frame = ttk.Frame(voice_frame)
-        speed_frame.pack(fill=tk.X, pady=5)
-        ttk.Label(speed_frame, text="🔊 Tốc độ:", font=("Segoe UI", 9), width=10).pack(side=tk.LEFT)
-        self.voice_speed_var = tk.DoubleVar(value=1.0)
-        
-        # Speed slider: 0.5x to 2.0x
-        self.voice_speed_slider = ttk.Scale(
-            speed_frame, from_=0.5, to=2.0, variable=self.voice_speed_var,
-            orient=tk.HORIZONTAL, length=150,
-            command=self._update_speed_label
-        )
-        self.voice_speed_slider.pack(side=tk.LEFT, padx=5)
-        
-        self.voice_speed_label = ttk.Label(speed_frame, text="1.0x", font=("Segoe UI", 9, "bold"), width=5)
-        self.voice_speed_label.pack(side=tk.LEFT)
-        
-        # Preset buttons
-        ttk.Button(speed_frame, text="0.5x", width=4, 
-                  command=lambda: self._set_voice_speed(0.5)).pack(side=tk.LEFT, padx=2)
-        ttk.Button(speed_frame, text="1x", width=4, 
-                  command=lambda: self._set_voice_speed(1.0)).pack(side=tk.LEFT, padx=2)
-        ttk.Button(speed_frame, text="1.5x", width=4, 
-                  command=lambda: self._set_voice_speed(1.5)).pack(side=tk.LEFT, padx=2)
-        
-        ttk.Separator(voice_frame, orient='horizontal').pack(fill=tk.X, pady=8)
-        
-        # Quiz mode
-        ttk.Label(voice_frame, text="📚 Chế độ Quiz:", font=("Segoe UI", 9, "bold")).pack(anchor=tk.W)
-        self.quiz_mode_var = tk.StringVar(value="normal")
-        ttk.Radiobutton(voice_frame, text="📖 Normal - Toàn bộ từ", 
-                       variable=self.quiz_mode_var, value="normal").pack(anchor=tk.W, pady=2)
-        ttk.Radiobutton(voice_frame, text="🎯 Practice - Ôn tập từ yếu", 
-                       variable=self.quiz_mode_var, value="practice").pack(anchor=tk.W, pady=2)
-        
-        # Faster Feedback Option
-        self.faster_feedback_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(voice_frame, text="⚡ Phản hồi nhanh (chỉ text, bỏ TTS)", 
-                       variable=self.faster_feedback_var).pack(anchor=tk.W, pady=5)
-        
-        # Range - Chọn từ câu nào đến câu nào (di chuyển từ left column)
-        range_frame_container = ttk.LabelFrame(right_col, text="📝 Phạm vi câu hỏi", padding=10)
-        range_frame_container.pack(fill=tk.X, pady=(0, 10))
-        
-        range_frame = ttk.Frame(range_frame_container)
-        range_frame.pack(fill=tk.X)
-        ttk.Label(range_frame, text="Từ:", font=("Segoe UI", 9)).pack(side=tk.LEFT)
+        range_row = ttk.Frame(range_frame)
+        range_row.pack(fill=tk.X)
+        ttk.Label(range_row, text="Từ:", font=("Segoe UI", 8)).pack(side=tk.LEFT)
         self.start_question_var = tk.IntVar(value=1)
-        self.start_spin = ttk.Spinbox(range_frame, from_=1, to=1000, width=6, textvariable=self.start_question_var)
-        self.start_spin.pack(side=tk.LEFT, padx=3)
-        ttk.Label(range_frame, text="Đến:", font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(10,0))
+        self.start_spin = ttk.Spinbox(range_row, from_=1, to=1000, width=5, textvariable=self.start_question_var)
+        self.start_spin.pack(side=tk.LEFT, padx=2)
+        ttk.Label(range_row, text="Đến:", font=("Segoe UI", 8)).pack(side=tk.LEFT, padx=(8,0))
         self.end_question_var = tk.IntVar(value=10)
-        self.end_spin = ttk.Spinbox(range_frame, from_=1, to=1000, width=6, textvariable=self.end_question_var)
-        self.end_spin.pack(side=tk.LEFT, padx=3)
+        self.end_spin = ttk.Spinbox(range_row, from_=1, to=1000, width=5, textvariable=self.end_question_var)
+        self.end_spin.pack(side=tk.LEFT, padx=2)
         
-        # Shuffle
         self.shuffle_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(range_frame_container, text="🔀 Trộn câu hỏi", variable=self.shuffle_var).pack(anchor=tk.W, pady=(5,0))
+        ttk.Checkbutton(range_row, text="🔀 Trộn", variable=self.shuffle_var).pack(side=tk.LEFT, padx=10)
         
-        # Start Buttons - HORIZONTAL LAYOUT
-        button_frame = ttk.LabelFrame(right_col, text="🚀 Bắt đầu", padding=10)
+        # ═══════════════════ START BUTTONS (bottom of left) ═══════════════════
+        button_frame = ttk.LabelFrame(left_col, text="🚀 Bắt đầu", padding=5)
         button_frame.pack(fill=tk.X)
-        
-        # Grid 2 columns
         button_frame.columnconfigure(0, weight=1)
         button_frame.columnconfigure(1, weight=1)
         
-        tk.Button(button_frame, text="▶️ KIỂM TRA\nTHƯỜNG", 
-                 command=self.start_quiz, font=("Segoe UI", 11, "bold"),
-                 bg="#2196f3", fg="white", height=3, cursor="hand2"
-                 ).grid(row=0, column=0, sticky="nsew", padx=3, pady=3)
+        tk.Button(button_frame, text="▶️ KIỂM TRA", command=self.start_quiz, 
+                 font=("Segoe UI", 10, "bold"), bg="#2196f3", fg="white", height=2, cursor="hand2"
+                 ).grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
         
-        tk.Button(button_frame, text="🎤 VOICE\nQUIZ", 
-                 command=self.start_voice_quiz, font=("Segoe UI", 11, "bold"),
-                 bg="#4caf50", fg="white", height=3, cursor="hand2"
-                 ).grid(row=0, column=1, sticky="nsew", padx=3, pady=3)
+        tk.Button(button_frame, text="🎤 VOICE QUIZ", command=self.start_voice_quiz, 
+                 font=("Segoe UI", 10, "bold"), bg="#4caf50", fg="white", height=2, cursor="hand2"
+                 ).grid(row=0, column=1, sticky="nsew", padx=2, pady=2)
         
-        # Pause button (only for Voice Quiz)
-        self.voice_pause_btn = tk.Button(
-            button_frame, text="⏸️ Tạm dừng", 
-            command=self._toggle_voice_pause, font=("Segoe UI", 10),
-            bg="#ff9800", fg="white", state=tk.DISABLED, cursor="hand2"
-        )
-        self.voice_pause_btn.grid(row=1, column=0, columnspan=2, sticky="ew", padx=3, pady=(3,0))
+        self.voice_pause_btn = tk.Button(button_frame, text="⏸️ Tạm dừng", 
+                 command=self._toggle_voice_pause, font=("Segoe UI", 9),
+                 bg="#ff9800", fg="white", state=tk.DISABLED, cursor="hand2")
+        self.voice_pause_btn.grid(row=1, column=0, columnspan=2, sticky="ew", padx=2, pady=2)
         
-        # Info - compact version at bottom
+        # ═══════════════════ RIGHT COLUMN - Voice Settings ═══════════════════
+        right_col = ttk.Frame(main_container)
+        right_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 0))
+        
+        # Voice Mode
+        mode_frame = ttk.LabelFrame(right_col, text="🎤 Chế độ Voice Quiz", padding=5)
+        mode_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        self.test_mode_var = tk.IntVar(value=1)
+        ttk.Radiobutton(mode_frame, text="Mode 1: Bot VN → User nói EN/CN/JP", 
+                       variable=self.test_mode_var, value=1, command=self._on_test_mode_change).pack(anchor=tk.W, pady=1)
+        ttk.Radiobutton(mode_frame, text="Mode 2: Bot EN/CN/JP → User nói VN", 
+                       variable=self.test_mode_var, value=2, command=self._on_test_mode_change).pack(anchor=tk.W, pady=1)
+        
+        # Voice Settings
+        voice_frame = ttk.LabelFrame(right_col, text="🎙️ Giọng đọc", padding=5)
+        voice_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        # Chatbot language
+        bot_row = ttk.Frame(voice_frame)
+        bot_row.pack(fill=tk.X, pady=2)
+        ttk.Label(bot_row, text="🤖 Bot:", font=("Segoe UI", 8), width=8).pack(side=tk.LEFT)
+        self.bot_language_var = tk.StringVar(value="vi")
+        bot_combo = ttk.Combobox(bot_row, textvariable=self.bot_language_var, 
+                                values=["Tiếng Việt", "Tiếng Anh", "Tiếng Trung", "Tiếng Nhật"], 
+                                state="readonly", width=12)
+        bot_combo.pack(side=tk.LEFT, padx=2)
+        bot_combo.current(0)
+        
+        # English voice
+        en_row = ttk.Frame(voice_frame)
+        en_row.pack(fill=tk.X, pady=2)
+        ttk.Label(en_row, text="English:", font=("Segoe UI", 8), width=8).pack(side=tk.LEFT)
+        self.en_voice_var = tk.StringVar(value="female")
+        ttk.Radiobutton(en_row, text="👩Nữ", variable=self.en_voice_var, value="female").pack(side=tk.LEFT)
+        ttk.Radiobutton(en_row, text="👨Nam", variable=self.en_voice_var, value="male").pack(side=tk.LEFT)
+        
+        # Japanese voice
+        ja_row = ttk.Frame(voice_frame)
+        ja_row.pack(fill=tk.X, pady=2)
+        ttk.Label(ja_row, text="日本語:", font=("Segoe UI", 8), width=8).pack(side=tk.LEFT)
+        self.ja_voice_var = tk.StringVar(value="female")
+        ttk.Radiobutton(ja_row, text="👩Nữ", variable=self.ja_voice_var, value="female").pack(side=tk.LEFT)
+        ttk.Radiobutton(ja_row, text="👨Nam", variable=self.ja_voice_var, value="male").pack(side=tk.LEFT)
+        
+        # Speed
+        speed_row = ttk.Frame(voice_frame)
+        speed_row.pack(fill=tk.X, pady=2)
+        ttk.Label(speed_row, text="🔊 Tốc độ:", font=("Segoe UI", 8), width=8).pack(side=tk.LEFT)
+        self.voice_speed_var = tk.DoubleVar(value=1.0)
+        self.voice_speed_slider = ttk.Scale(speed_row, from_=0.5, to=2.0, variable=self.voice_speed_var,
+                                           orient=tk.HORIZONTAL, length=100, command=self._update_speed_label)
+        self.voice_speed_slider.pack(side=tk.LEFT, padx=2)
+        self.voice_speed_label = ttk.Label(speed_row, text="1.0x", font=("Segoe UI", 8, "bold"), width=4)
+        self.voice_speed_label.pack(side=tk.LEFT)
+        ttk.Button(speed_row, text="0.5x", width=3, command=lambda: self._set_voice_speed(0.5)).pack(side=tk.LEFT, padx=1)
+        ttk.Button(speed_row, text="1x", width=2, command=lambda: self._set_voice_speed(1.0)).pack(side=tk.LEFT, padx=1)
+        ttk.Button(speed_row, text="1.5x", width=3, command=lambda: self._set_voice_speed(1.5)).pack(side=tk.LEFT, padx=1)
+        
+        # Quiz Mode + Options
+        options_frame = ttk.LabelFrame(right_col, text="📚 Tùy chọn Quiz", padding=5)
+        options_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        self.quiz_mode_var = tk.StringVar(value="normal")
+        mode_row = ttk.Frame(options_frame)
+        mode_row.pack(fill=tk.X, pady=2)
+        ttk.Radiobutton(mode_row, text="📖 Normal", variable=self.quiz_mode_var, value="normal").pack(side=tk.LEFT)
+        ttk.Radiobutton(mode_row, text="🎯 Ôn từ yếu", variable=self.quiz_mode_var, value="practice").pack(side=tk.LEFT, padx=10)
+        
+        self.faster_feedback_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(options_frame, text="⚡ Phản hồi nhanh (bỏ TTS)", variable=self.faster_feedback_var).pack(anchor=tk.W, pady=2)
+        
+        # Info tip
         info_frame = ttk.Frame(right_col)
-        info_frame.pack(fill=tk.X, pady=(10,0))
+        info_frame.pack(fill=tk.BOTH, expand=True, pady=(5, 0))
         
-        info_text = tk.Text(info_frame, height=4, wrap=tk.WORD, font=("Segoe UI", 8), 
-                           bg="#f9f9f9", relief=tk.FLAT, padx=8, pady=8)
-        info_text.pack(fill=tk.X)
-        info_text.insert(tk.END, "💡 Chọn file Excel → Test mic → Chọn loại quiz → Voice Quiz\n")
-        info_text.insert(tk.END, "⚡ Auto timing: chatbot tự tính thời gian cho từng câu")
+        info_text = tk.Text(info_frame, height=3, wrap=tk.WORD, font=("Segoe UI", 8), 
+                           bg="#f5f5f5", relief=tk.FLAT, padx=5, pady=5)
+        info_text.pack(fill=tk.BOTH, expand=True)
+        info_text.insert(tk.END, "💡 Chọn file Excel → Test mic → Voice Quiz\n")
+        info_text.insert(tk.END, "🤖 Auto timing: tự tính thời gian theo độ dài câu")
         info_text.config(state=tk.DISABLED)
     
     def _create_quiz_tab(self):
@@ -705,6 +778,187 @@ class LanguageQuizGUI:
             command=self.voice_stop_quiz, 
             width=20, style='Voice.TButton'
         ).pack(side=tk.LEFT, padx=5, ipady=8)
+    
+    def _create_pronunciation_tab(self):
+        """🎤 Tab Luyện phát âm - Pronunciation Practice"""
+        # Main frame - simple layout without scrollbar
+        main_frame = ttk.Frame(self.pronunciation_tab)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Container with two columns
+        container = ttk.Frame(main_frame)
+        container.pack(fill=tk.BOTH, expand=True)
+        
+        # Left column - File & Settings (compact)
+        left_col = ttk.Frame(container)
+        left_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=False, padx=(0, 10))
+        
+        # File & Sheet selection
+        file_frame = ttk.LabelFrame(left_col, text="📁 Chọn File & Sheet", padding=5)
+        file_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        ttk.Button(file_frame, text="📂 Chọn File Excel", command=self._pron_select_file, width=18).pack(fill=tk.X, pady=2)
+        self.pron_file_label = ttk.Label(file_frame, text="(Chưa chọn)", foreground="gray", font=("Segoe UI", 8))
+        self.pron_file_label.pack(fill=tk.X, pady=2)
+        
+        ttk.Label(file_frame, text="Sheet:", font=("Segoe UI", 8)).pack(anchor=tk.W, pady=(3, 0))
+        self.pron_sheet_combo = ttk.Combobox(file_frame, state="readonly", width=20, font=("Segoe UI", 8))
+        self.pron_sheet_combo.pack(fill=tk.X, pady=2)
+        self.pron_sheet_combo.bind("<<ComboboxSelected>>", lambda e: self._pron_update_questions())
+        
+        # Pronunciation Settings
+        voice_frame = ttk.LabelFrame(left_col, text="🎙️ Cài đặt Giọng", padding=5)
+        voice_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        ttk.Label(voice_frame, text="Giọng:", font=("Segoe UI", 8)).pack(anchor=tk.W)
+        voice_row = ttk.Frame(voice_frame)
+        voice_row.pack(fill=tk.X, pady=2)
+        self.pron_voice_var = tk.StringVar(value=self.user_settings.get("pron_voice", "female"))
+        ttk.Radiobutton(voice_row, text="🎀 Nữ (Joanna)", variable=self.pron_voice_var, value="female").pack(anchor=tk.W)
+        ttk.Radiobutton(voice_row, text="🎩 Nam (Matthew)", variable=self.pron_voice_var, value="male").pack(anchor=tk.W)
+        
+        ttk.Label(voice_frame, text="Tốc độ:", font=("Segoe UI", 8)).pack(anchor=tk.W, pady=(3, 0))
+        speed_row = ttk.Frame(voice_frame)
+        speed_row.pack(fill=tk.X, pady=2)
+        self.pron_speed_var = tk.DoubleVar(value=self.user_settings.get("pron_speed", 1.0))
+        for speed_val, speed_label in [(0.5, "0.5x"), (1.0, "1.0x"), (1.5, "1.5x")]:
+            ttk.Button(speed_row, text=speed_label, width=3, command=lambda s=speed_val: self.pron_speed_var.set(s)).pack(side=tk.LEFT, padx=1)
+        
+        # Add trace to save when voice/speed change
+        self.pron_voice_var.trace_add("write", lambda *args: self._pron_save_settings())
+        self.pron_speed_var.trace_add("write", lambda *args: self._pron_save_settings())
+        
+        # Quiz Settings
+        quiz_frame = ttk.LabelFrame(left_col, text="⚙️ Loại Quiz", padding=5)
+        quiz_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        self.pron_quiz_type_var = tk.StringVar(value=self.user_settings.get("pron_quiz_type", "meaning"))
+        ttk.Radiobutton(quiz_frame, text="💬 Từ vựng", variable=self.pron_quiz_type_var, value="meaning").pack(anchor=tk.W)
+        ttk.Radiobutton(quiz_frame, text="📝 Câu ví dụ", variable=self.pron_quiz_type_var, value="example").pack(anchor=tk.W)
+        
+        # Test Mode
+        mode_frame = ttk.LabelFrame(left_col, text="🔄 Chế độ Test", padding=5)
+        mode_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        self.pron_test_mode_var = tk.IntVar(value=self.user_settings.get("pron_test_mode", 1))
+        ttk.Radiobutton(mode_frame, text="VN → EN/中文/日", variable=self.pron_test_mode_var, value=1).pack(anchor=tk.W)
+        ttk.Radiobutton(mode_frame, text="EN/中文/日 → VN", variable=self.pron_test_mode_var, value=2).pack(anchor=tk.W)
+        
+        # Add trace to save when quiz type/test mode change
+        self.pron_quiz_type_var.trace_add("write", lambda *args: self._pron_save_settings())
+        self.pron_test_mode_var.trace_add("write", lambda *args: self._pron_save_settings())
+        
+        # Range
+        range_frame = ttk.LabelFrame(left_col, text="📋 Phạm vi câu hỏi", padding=5)
+        range_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        range_row1 = ttk.Frame(range_frame)
+        range_row1.pack(fill=tk.X, pady=2)
+        ttk.Label(range_row1, text="Từ:", font=("Segoe UI", 8)).pack(side=tk.LEFT)
+        self.pron_start_var = tk.IntVar(value=self.user_settings.get("pron_start", 1))
+        ttk.Spinbox(range_row1, from_=1, to=1000, textvariable=self.pron_start_var, width=5).pack(side=tk.LEFT, padx=5)
+        
+        range_row2 = ttk.Frame(range_frame)
+        range_row2.pack(fill=tk.X, pady=2)
+        ttk.Label(range_row2, text="Đến:", font=("Segoe UI", 8)).pack(side=tk.LEFT)
+        self.pron_end_var = tk.IntVar(value=self.user_settings.get("pron_end", 50))
+        ttk.Spinbox(range_row2, from_=1, to=1000, textvariable=self.pron_end_var, width=5).pack(side=tk.LEFT, padx=5)
+        
+        # Add trace to save when range changes
+        self.pron_start_var.trace_add("write", lambda *args: self._pron_save_settings())
+        self.pron_end_var.trace_add("write", lambda *args: self._pron_save_settings())
+        
+        # Start button
+        ttk.Button(
+            left_col, 
+            text="▶️ BẮT ĐẦU LUYỆN PHÁT ÂM",
+            command=self._start_pronunciation_practice,
+            width=22
+        ).pack(pady=(10, 0), ipady=12, fill=tk.X)
+        
+        # Right column - Info text
+        right_col = ttk.LabelFrame(container, text="📖 Hướng dẫn Luyện phát âm", padding=8)
+        right_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        info_text = scrolledtext.ScrolledText(right_col, height=20, width=40, wrap=tk.WORD, font=("Segoe UI", 9))
+        info_text.pack(fill=tk.BOTH, expand=True)
+        info_text.insert(tk.END, """📌 QUY TRÌNH:
+1. Máy sẽ đọc từ/câu bằng Polly
+2. Bạn nghe xong hãy nhắc lại
+3. Hệ thống so sánh phát âm
+4. Hiển thị điểm độ tương đồng
+
+🎯 CHẤM ĐIỂM:
+• ≥90%: ⭐⭐⭐ Xuất sắc!
+• ≥75%: ⭐⭐ Tốt!
+• ≥60%: ⭐ Có cải thiện
+• <60%: Tiếp tục luyện
+
+💡 MẸO:
+✓ Phát âm rõ và tự nhiên
+✓ Không vội vàng
+✓ Lắng nghe máy đọc kỹ
+
+📤 KẾT QUẢ:
+• Lưu vào Leaderboard
+• Gửi lên Discord
+• Theo dõi tiến độ
+
+🔧 CAI DAT:
+- Chon file Excel chua tu
+- Chon sheet can hoc
+- Chon giong & toc do
+- Chon loai quiz
+- Chon pham vi cau hoi
+- An "BAT DAU" de bat dau""")
+        info_text.config(state=tk.DISABLED)
+        
+        # Load previous session if available
+        self._load_pronunciation_previous_session()
+    
+    def _load_pronunciation_previous_session(self):
+        """Load previous pronunciation settings"""
+        try:
+            last_file = self.user_settings.get("pron_file")
+            last_sheet = self.user_settings.get("pron_sheet")
+            last_voice = self.user_settings.get("pron_voice", "female")
+            last_speed = self.user_settings.get("pron_speed", 1.0)
+            last_quiz_type = self.user_settings.get("pron_quiz_type", "meaning")
+            last_test_mode = self.user_settings.get("pron_test_mode", 1)
+            last_start = self.user_settings.get("pron_start", 1)
+            last_end = self.user_settings.get("pron_end", 50)
+            
+            # Restore voice and speed
+            self.pron_voice_var.set(last_voice)
+            self.pron_speed_var.set(last_speed)
+            self.pron_quiz_type_var.set(last_quiz_type)
+            self.pron_test_mode_var.set(last_test_mode)
+            self.pron_start_var.set(last_start)
+            self.pron_end_var.set(last_end)
+            
+            # Restore file if it exists
+            if last_file and Path(last_file).exists():
+                self.pron_selected_file = last_file
+                file_name = Path(last_file).name
+                self.pron_file_label.config(text=file_name, foreground="green")
+                
+                # Load sheets
+                try:
+                    import openpyxl
+                    wb = openpyxl.load_workbook(last_file, data_only=True)
+                    sheets = wb.sheetnames
+                    self.pron_sheet_combo['values'] = sheets
+                    
+                    if last_sheet and last_sheet in sheets:
+                        self.pron_sheet_combo.set(last_sheet)
+                    elif sheets:
+                        self.pron_sheet_combo.current(0)
+                    
+                    self._pron_update_questions()
+                except:
+                    pass
+        except Exception as e:
+            print(f"[INFO] Could not restore pronunciation session: {e}")
     
     def _create_files_manager_tab(self):
         """Tab Quản Lý File - Manage multiple Excel files"""
@@ -1219,6 +1473,13 @@ class LanguageQuizGUI:
         )
         self.leaderboard_list.pack(fill=tk.BOTH, expand=True)
         
+        # Bind double-click to show detail
+        self.leaderboard_list.bind('<Double-Button-1>', self._show_leaderboard_detail)
+        
+        # Hint
+        ttk.Label(leaderboard_frame, text="💡 Double-click để xem chi tiết", 
+                 font=("Segoe UI", 8), foreground="gray").pack(anchor=tk.W)
+        
         # Load leaderboard
         self._load_leaderboard()
     
@@ -1727,6 +1988,9 @@ class LanguageQuizGUI:
         else:
             self.flashcard_front_frame.config(bg="#e3f2fd")
             self.flashcard_front_label.config(bg="#e3f2fd", fg="#1565c0")
+        
+        # 🔊 Auto TTS - Tự động đọc từ khi hiển thị thẻ
+        self._speak_flashcard_word()
     
     def _flip_flashcard(self, event):
         """Lật thẻ flashcard"""
@@ -1814,15 +2078,28 @@ class LanguageQuizGUI:
         
         # Xác định ngôn ngữ từ tên file
         file_name = getattr(self, 'flashcard_file', '').lower()
-        if 'chinese' in file_name or 'zh' in file_name or 'hán' in file_name:
+        if 'chinese' in file_name or 'zh' in file_name or 'hán' in file_name or 'trung' in file_name:
             lang_code = "zh-cn"
-        elif 'japanese' in file_name or 'ja' in file_name or 'nhật' in file_name:
+            polly_voice = "Zhiyu"
+        elif 'japanese' in file_name or 'ja' in file_name or 'nhật' in file_name or 'nhat' in file_name:
             lang_code = "ja"
+            polly_voice = "Mizuki" if self.ja_voice_var.get() == "female" else "Takumi"
         else:
             lang_code = "en"
+            polly_voice = "Joanna" if self.en_voice_var.get() == "female" else "Matthew"
+        
+        print(f"🔊 Flashcard TTS: file={file_name}, lang={lang_code}, voice={polly_voice}")
         
         def speak_async():
             try:
+                # Thử dùng Polly trước (chất lượng tốt hơn)
+                try:
+                    self._speak_with_polly(word, polly_voice, lang_code)
+                    return
+                except Exception as polly_err:
+                    print(f"⚠️ Polly error, fallback to gTTS: {polly_err}")
+                
+                # Fallback to gTTS
                 from gtts import gTTS
                 import tempfile
                 import os
@@ -1837,13 +2114,14 @@ class LanguageQuizGUI:
                     temp_path = f.name
                 tts.save(temp_path)
                 
-                mixer.init()
+                if not mixer.get_init():
+                    mixer.init()
                 mixer.music.load(temp_path)
                 mixer.music.play()
                 while mixer.music.get_busy():
                     import time
                     time.sleep(0.1)
-                mixer.quit()
+                mixer.music.unload()
                 os.unlink(temp_path)
             except Exception as e:
                 print(f"⚠️ TTS error: {e}")
@@ -2183,6 +2461,9 @@ class LanguageQuizGUI:
             self.user_settings["last_file"] = file_path
             self._save_settings()
             
+            # 📂 Thêm vào recent files
+            self._add_to_recent_files(file_path)
+            
             try:
                 wb = openpyxl.load_workbook(file_path, data_only=True)
                 self.sheet_combo['values'] = wb.sheetnames
@@ -2422,7 +2703,9 @@ class LanguageQuizGUI:
             "user_answer": user_answer,
             "correct_answer": correct_answer,
             "score": score,
-            "attempt": self.attempt
+            "attempt": self.attempt,
+            "test_mode": self.test_mode,  # 📝 Thêm test_mode để hiển thị câu hỏi đầy đủ
+            "quiz_type": self.quiz_type_str  # 📝 Thêm quiz_type
         })
         
         self.feedback_text.config(state=tk.NORMAL)
@@ -2456,9 +2739,24 @@ class LanguageQuizGUI:
     
     def start_voice_quiz(self):
         """Bắt đầu Voice Quiz"""
+        # 🛑 STOP quiz cũ nếu đang chạy
+        if hasattr(self, 'voice_quiz_running') and self.voice_quiz_running:
+            print("🛑 Dừng quiz cũ...")
+            self.voice_quiz_stop_event.set()  # Báo hiệu dừng
+            self.stop_voice_quiz()
+            # Đợi quiz cũ thực sự dừng
+            for i in range(20):  # Max wait 2 seconds
+                if not self.voice_quiz_running:
+                    print("✅ Quiz cũ đã dừng hết")
+                    break
+                time.sleep(0.1)
+        
         if not self.selected_file:
             messagebox.showerror("Lỗi", "❌ Vui lòng chọn file Excel!")
             return
+        
+        # Mark quiz is running
+        self.voice_quiz_running = True
         
         # Lưu ALL settings
         self.user_settings["last_sheet"] = self.sheet_combo.get()
@@ -2479,7 +2777,7 @@ class LanguageQuizGUI:
         quiz_mode = self.quiz_mode_var.get()
         
         if quiz_mode == "practice":
-            # Practice Mode: Load weak words from database + match with Excel file
+            # Practice Mode: Load weak words from Smart Review database - FILTER BY FILE/SHEET
             try:
                 # 📂 First, load Excel file to get full data (word + meaning + examples)
                 self.data = self._read_excel_data(self.sheet_combo.get())
@@ -2487,36 +2785,76 @@ class LanguageQuizGUI:
                     messagebox.showerror("Lỗi", "❌ Không đọc được file Excel!")
                     return
                 
-                # 🔍 Get weak words from database
-                all_weak_words = []
-                for lang in ["English", "Japanese", "Chinese", "Vietnamese"]:
-                    weak_words = self.study_db.get_weak_words(lang)
-                    all_weak_words.extend(weak_words)
+                # 🔍 Get weak questions from Smart Review DB - FILTERED BY FILE
+                file_path = str(self.selected_file)
+                sheet_name = self.sheet_combo.get()
+                user_name = "Default"  # Or get from settings
                 
-                if not all_weak_words:
+                # Use Smart Review DB to get weak questions for THIS specific file
+                weak_questions = []
+                if self.smart_review_db:
+                    weak_questions = self.smart_review_db.get_weak_questions(
+                        file_path=file_path,
+                        user_name=user_name,
+                        limit=100  # Get up to 100 weak questions
+                    )
+                    print(f"📚 File: {Path(file_path).name} | Sheet: {sheet_name}")
+                    print(f"🔍 Tìm thấy {len(weak_questions)} câu yếu từ Smart Review DB")
+                
+                # Fallback to old method if Smart Review has no data
+                if not weak_questions:
+                    all_weak_words = []
+                    for lang in ["English", "Japanese", "Chinese", "Vietnamese"]:
+                        ww = self.study_db.get_weak_words(lang)
+                        all_weak_words.extend(ww)
+                    weak_word_texts = {w["word"].strip().lower() for w in all_weak_words}
+                else:
+                    # Use question IDs from Smart Review
+                    weak_question_ids = {q['question_id'] for q in weak_questions}
+                    weak_word_texts = {q['question_text'].strip().lower() for q in weak_questions}
+                
+                if not weak_word_texts and not weak_questions:
                     messagebox.showinfo("Thông báo", 
-                        "✅ Tuyệt vời!\n\n"
-                        "Không có từ nào cần ôn tập.\n\n"
-                        "Tất cả từ đều đã học tốt! 🎉\n\n"
-                        "💡 Mẹo: Hãy thử chế độ Normal để học từ mới.")
+                        f"✅ Tuyệt vời!\n\n"
+                        f"Không có từ/câu nào cần ôn tập cho file này.\n\n"
+                        f"📁 File: {Path(file_path).name}\n"
+                        f"📑 Sheet: {sheet_name}\n\n"
+                        f"💡 Mẹo: Hãy thử chế độ Normal để học từ mới.")
                     return
                 
                 # 🔗 Match weak words with Excel data to get full info
-                weak_word_texts = {w["word"].strip().lower() for w in all_weak_words}
-                
                 selected_data = []
+                seen_words = set()  # Tránh trùng lặp
+                
                 for excel_row in self.data:
                     word_in_excel = excel_row.get("word", "").strip().lower()
-                    if word_in_excel in weak_word_texts:
-                        # Found matching word in Excel - has full data!
+                    excel_row_num = excel_row.get("excel_row", 0)
+                    
+                    # Skip nếu đã có word này (tránh trùng lặp)
+                    if word_in_excel in seen_words:
+                        continue
+                    
+                    # Skip nếu không có nội dung câu hỏi (meaning hoặc sentence rỗng)
+                    meaning = excel_row.get("meaning", "").strip()
+                    sentence_vn = excel_row.get("sentence_vn", "").strip()
+                    if not meaning and not sentence_vn:
+                        print(f"⚠️ Skip empty: #{excel_row_num} '{excel_row.get('word')}'")
+                        continue
+                    
+                    # Match by question_id OR by word text
+                    if (weak_questions and excel_row_num in {q['question_id'] for q in weak_questions}) or \
+                       (word_in_excel in weak_word_texts):
                         selected_data.append(excel_row)
-                        print(f"✅ Matched weak word: '{excel_row.get('word')}' with meaning: '{excel_row.get('meaning', 'N/A')}'")
+                        seen_words.add(word_in_excel)
+                        print(f"✅ Matched weak: #{excel_row_num} '{excel_row.get('word')}'")
                 
                 if not selected_data:
                     messagebox.showwarning(
                         "Practice Mode",
-                        f"⚠️ Tìm thấy {len(all_weak_words)} từ yếu trong database\n"
+                        f"⚠️ Tìm thấy {len(weak_questions) or len(weak_word_texts)} từ yếu trong database\n"
                         f"Nhưng không có từ nào khớp với file Excel hiện tại!\n\n"
+                        f"📁 File: {Path(file_path).name}\n"
+                        f"📑 Sheet: {sheet_name}\n\n"
                         f"💡 Giải pháp:\n"
                         f"• Chọn đúng file Excel mà bạn đã học trước đó\n"
                         f"• Hoặc làm Normal Quiz với file này để tạo dữ liệu mới"
@@ -2534,8 +2872,10 @@ class LanguageQuizGUI:
                 stats_text = ", ".join([f"{lang}: {count}" for lang, count in lang_stats.items()])
                 
                 messagebox.showinfo("Chế độ Ôn tập", 
-                    f"🎯 CHẾ ĐỘ PRACTICE\n\n"
-                    f"📚 Tổng số từ yếu: {num_questions}\n\n"
+                    f"🎯 CHẾ ĐỘ PRACTICE - ÔN TẬP TỪ YẾU\n\n"
+                    f"📁 File: {Path(file_path).name}\n"
+                    f"📑 Sheet: {sheet_name}\n\n"
+                    f"📚 Tổng số từ/câu yếu: {num_questions}\n\n"
                     f"🌐 Phân bố:\n{stats_text}\n\n"
                     f"💡 Hãy cố gắng trả lời đúng để cải thiện!\n\n"
                     f"👉 Nhấn OK để bắt đầu Voice Quiz ôn tập!")
@@ -2597,7 +2937,11 @@ class LanguageQuizGUI:
         self.quiz_active = False
         time.sleep(0.1)  # Cho thread cũ kịp dừng
         
+        # Reset event cho quiz mới
+        self.voice_quiz_stop_event.clear()
+        
         # ✅ Đánh dấu quiz mới đang chạy
+        self.voice_quiz_running = True
         self.quiz_active = True
         
         # Tạo tab voice quiz nếu chưa có
@@ -2634,6 +2978,11 @@ class LanguageQuizGUI:
     
     def voice_display_question(self):
         """Hiển thị câu hỏi voice"""
+        # 🛑 Check nếu quiz đã bị stop - bỏ qua hoàn toàn
+        if self.voice_quiz_stop_event.is_set():
+            print("⏹️ Quiz đã stop, bỏ qua voice_display_question")
+            return
+        
         if self.current_question_idx >= len(self.quiz_engine.questions):
             self.voice_show_results()
             return
@@ -3003,7 +3352,9 @@ class LanguageQuizGUI:
                     "user_answer": "(Không trả lời)",
                     "correct_answer": correct_answer,
                     "score": 0,  # ❌ 0 điểm
-                    "attempt": 1
+                    "attempt": 1,
+                    "test_mode": self.test_mode,  # 📝 Thêm test_mode
+                    "quiz_type": self.quiz_type_str  # 📝 Thêm quiz_type
                 })
                 
                 # � Save to Smart Review DB
@@ -3032,7 +3383,7 @@ class LanguageQuizGUI:
                 return
             
             # 🚀 Kiểm tra quiz vẫn đang chạy trước khi xử lý
-            if not self.quiz_active:
+            if not self.quiz_active or self.voice_quiz_stop_event.is_set():
                 print("⏹️ Quiz đã dừng, bỏ qua xử lý câu trả lời")
                 return
             
@@ -3052,7 +3403,9 @@ class LanguageQuizGUI:
                 "user_answer": user_answer,
                 "correct_answer": correct_answer,
                 "score": score,
-                "attempt": 1
+                "attempt": 1,
+                "test_mode": self.test_mode,  # 📝 Thêm test_mode để hiển thị câu hỏi đầy đủ
+                "quiz_type": self.quiz_type_str  # 📝 Thêm quiz_type
             })
             
             # 📚 Save to Smart Review DB
@@ -3433,6 +3786,10 @@ class LanguageQuizGUI:
         try:
             if not self.app_running:
                 return
+            # 🛑 Check nếu quiz đã bị stop - bỏ qua
+            if self.voice_quiz_stop_event.is_set():
+                print("⏹️ Quiz đã stop, bỏ qua next question")
+                return
             self.root.after(0, self.voice_next_question)
         except RuntimeError as e:
             print(f"⚠️ Tkinter error (next question): {e}")
@@ -3456,45 +3813,108 @@ class LanguageQuizGUI:
     
     def test_microphone(self):
         """Test mic với real-time audio level"""
+        print("🎤 Test Mic started...")
         try:
+            import speech_recognition as sr
+            import audioop
+            import pyaudio
+            
             # Lấy mic index
             combo_idx = self.mic_combo.current()
             mic_device_index = None
             if combo_idx >= 0 and combo_idx < len(self.mic_device_indices):
                 mic_device_index = self.mic_device_indices[combo_idx]
             
+            print(f"   Mic index: {mic_device_index}")
+            
             self.test_mic_label.config(text="🎙️ Đang test... Hãy nói vào mic!", foreground="red")
             self.test_mic_bar.config(value=0)
-            
-            def update_level(level):
-                """Callback để update progress bar"""
-                self.root.after(0, lambda: self.test_mic_bar.config(value=level))
+            self.test_mic_btn.config(state=tk.DISABLED, bg="#888888")
             
             # Chạy test trong thread
             def run_test():
-                success = self.voice_manager.voice_manager.test_microphone(
-                    device_index=mic_device_index,
-                    duration=5,
-                    level_callback=update_level
-                )
-                
-                if success:
+                try:
+                    print("   Opening pyaudio stream...")
+                    p = pyaudio.PyAudio()
+                    stream = p.open(
+                        format=pyaudio.paInt16,
+                        channels=1,
+                        rate=16000,
+                        input=True,
+                        input_device_index=mic_device_index,
+                        frames_per_buffer=1024
+                    )
+                    print("   Stream opened! Recording 3 seconds...")
+                    
+                    # Listen và hiển thị audio level REAL-TIME
+                    start_time = time.time()
+                    max_level = 0
+                    frame_count = 0
+                    
+                    # Read audio for 3 seconds và update progress bar
+                    while time.time() - start_time < 3:
+                        try:
+                            data = stream.read(1024, exception_on_overflow=False)
+                            frame_count += 1
+                            
+                            # Tính RMS (root mean square) - mức năng lượng âm thanh
+                            rms = audioop.rms(data, 2)
+                            # Scale to 0-100
+                            level = min(100, int(rms / 50))
+                            max_level = max(max_level, level)
+                            
+                            # Update progress bar - REAL-TIME
+                            self.root.after(0, lambda v=level: self.test_mic_bar.config(value=v))
+                            time.sleep(0.05)  # Update 20 times/second
+                        except Exception as e:
+                            print(f"   Error reading frame: {e}")
+                            break
+                    
+                    print(f"   Recorded {frame_count} frames, max level: {max_level}%")
+                    
+                    stream.stop_stream()
+                    stream.close()
+                    p.terminate()
+                    
+                    # Đánh giá kết quả
+                    if max_level < 5:
+                        msg = "❌ Không nghe thấy âm thanh! Kiểm tra mic."
+                        color = "red"
+                        print(f"   Result: {msg}")
+                        self.root.after(0, lambda: self.test_mic_label.config(text=msg, foreground=color))
+                    elif max_level < 20:
+                        msg = "⚠️ Âm thanh yếu! Hãy nói to hơn."
+                        color = "orange"
+                        print(f"   Result: {msg}")
+                        self.root.after(0, lambda: self.test_mic_label.config(text=msg, foreground=color))
+                    else:
+                        msg = f"✅ Mic OK! Mức tối đa: {max_level}%"
+                        color = "green"
+                        print(f"   Result: {msg}")
+                        self.root.after(0, lambda: self.test_mic_label.config(text=msg, foreground=color))
+                    
+                except Exception as e:
+                    print(f"❌ Test error: {e}")
+                    import traceback
+                    traceback.print_exc()
                     self.root.after(0, lambda: self.test_mic_label.config(
-                        text="✅ Mic hoạt động tốt!", foreground="green"
+                        text=f"❌ Lỗi: {str(e)[:50]}", foreground="red"
                     ))
-                else:
-                    self.root.after(0, lambda: self.test_mic_label.config(
-                        text="❌ Mic không nhận được âm thanh!", foreground="red"
-                    ))
-                
-                # Reset bar sau 2s
-                self.root.after(2000, lambda: self.test_mic_bar.config(value=0))
+                finally:
+                    # Reset UI
+                    self.root.after(2000, lambda: self.test_mic_bar.config(value=0))
+                    self.root.after(0, lambda: self.test_mic_btn.config(state=tk.NORMAL, bg="#4CAF50"))
+                    print("✅ Test complete")
             
             Thread(target=run_test, daemon=True).start()
         
         except Exception as e:
-            self.test_mic_label.config(text=f"❌ Lỗi: {e}", foreground="red")
             print(f"❌ Test mic error: {e}")
+            import traceback
+            traceback.print_exc()
+            self.test_mic_label.config(text=f"❌ Lỗi: {e}", foreground="red")
+            self.test_mic_btn.config(state=tk.NORMAL, bg="#4CAF50")
+
     
     def _calculate_auto_timeout(self, correct_answer, quiz_type):
         """
@@ -3679,6 +4099,11 @@ class LanguageQuizGUI:
     
     def voice_next_question(self):
         """Câu tiếp theo (Voice) - kiểm tra xem quiz kết thúc chưa"""
+        # 🛑 Check nếu quiz đã bị stop - bỏ qua hoàn toàn
+        if self.voice_quiz_stop_event.is_set():
+            print("⏹️ Quiz đã stop, bỏ qua voice_next_question")
+            return
+        
         self.current_question_idx += 1
         
         # 🚀 Kiểm tra quiz đã hết câu hỏi chưa
@@ -3694,6 +4119,19 @@ class LanguageQuizGUI:
         self.quiz_active = False  # 🚀 Dừng thread
         if messagebox.askyesno("Xác nhận", "❌ Dừng kiểm tra?"):
             self.voice_show_results()
+    
+    def stop_voice_quiz(self):
+        """🛑 Dừng quiz ngay lập tức (không hỏi)"""
+        self.quiz_active = False
+        self.voice_quiz_running = False
+        self.voice_quiz_stop_event.set()  # Báo hiệu stop
+        # Stop audio playback
+        try:
+            if hasattr(self, 'voice_manager') and self.voice_manager:
+                self.voice_manager.voice_manager.stop_speaking()
+        except:
+            pass
+        print("✅ Quiz stopped completely")
     
     def voice_show_results(self):
         """Hiển thị kết quả + hỏi tên user để lưu"""
@@ -3894,6 +4332,11 @@ class LanguageQuizGUI:
         num_questions = len(self.quiz_results)
         avg_score = (total_points / (num_questions * 10)) * 100 if num_questions > 0 else 0
         
+        # 📊 Thống kê đúng/sai chi tiết
+        correct_count = sum(1 for r in self.quiz_results if r.get("score", 0) >= 8)
+        wrong_count = num_questions - correct_count
+        partial_count = sum(1 for r in self.quiz_results if 0 < r.get("score", 0) < 8)
+        
         if avg_score >= 90:
             grade = "A - Xuất sắc"
         elif avg_score >= 80:
@@ -3905,6 +4348,14 @@ class LanguageQuizGUI:
         else:
             grade = "F - Chưa đạt"
         
+        # Lấy thông tin file và sheet
+        file_name = Path(self.selected_file).name if hasattr(self, 'selected_file') and self.selected_file else "Unknown"
+        sheet_name = self.sheet_combo.get() if hasattr(self, 'sheet_combo') else "Sheet1"
+        
+        # Lấy phạm vi câu hỏi
+        start_q = self.start_question_var.get() if hasattr(self, 'start_question_var') else 1
+        end_q = self.end_question_var.get() if hasattr(self, 'end_question_var') else num_questions
+        
         report = f"""
 ═══════════════════════════════════════════════════════════════
 📊 KẾT QUẢ KIỂM TRA
@@ -3912,9 +4363,16 @@ class LanguageQuizGUI:
 
 👤 Học sinh: {user_name}
 🕐 Thời gian: {timestamp}
+📁 File: {file_name}
+📑 Sheet: {sheet_name}
 📝 Loại bài: {test_type}
+📋 Phạm vi: Từ câu {start_q} đến câu {end_q}
 
 📈 TỔNG HỢP:
+   ✅ Đúng: {correct_count}/{num_questions} câu
+   ❌ Sai: {wrong_count}/{num_questions} câu
+   ⚠️ Gần đúng: {partial_count} câu
+   
    Điểm trung bình: {avg_score:.1f}/100
    Xếp loại: {grade}
    Tổng điểm: {total_points}/{num_questions * 10}
@@ -3923,10 +4381,34 @@ class LanguageQuizGUI:
 """
         for result in self.quiz_results:
             question_num = result.get('question_num', '?')  # Lấy số thứ tự từ Excel
-            report += f"\n{question_num}. {result['question']} (Lần {result['attempt']})\n"
-            report += f"   Bạn trả lời: {result['user_answer']}\n"
-            report += f"   Đáp án: {result['correct_answer']}\n"
-            report += f"   Điểm: {result['score']}/10\n"
+            score = result.get('score', 0)
+            emoji = "✅" if score >= 8 else "⚠️" if score > 0 else "❌"
+            
+            # 📝 Xác định câu hỏi đầy đủ dựa vào test_mode và quiz_type
+            test_mode = result.get('test_mode', 1)
+            quiz_type = result.get('quiz_type', 'meaning')
+            word = result.get('question', '')
+            
+            if test_mode == 1:  # Mode 1: VN → Foreign
+                if quiz_type == 'meaning':
+                    full_question = f"Dịch nghĩa '{word}' sang tiếng nước ngoài"
+                elif quiz_type == 'example':
+                    full_question = f"Dịch câu '{word}' sang tiếng nước ngoài"
+                else:
+                    full_question = f"Dịch '{word}' sang tiếng nước ngoài"
+            else:  # Mode 2: Foreign → VN
+                if quiz_type == 'meaning':
+                    full_question = f"Nghĩa tiếng Việt của từ '{word}' là gì?"
+                elif quiz_type == 'example':
+                    full_question = f"Dịch câu '{word}' sang tiếng Việt"
+                else:
+                    full_question = f"Dịch '{word}' sang tiếng Việt"
+            
+            report += f"\n{emoji} {question_num}. (Lần {result['attempt']})\n"
+            report += f"   ❓ Câu hỏi: {full_question}\n"
+            report += f"   🎤 Bạn trả lời: {result['user_answer']}\n"
+            report += f"   ✨ Đáp án đúng: {result['correct_answer']}\n"
+            report += f"   📊 Điểm: {result['score']}/10\n"
         
         self.results_text.config(state=tk.NORMAL)
         self.results_text.delete(1.0, tk.END)
@@ -3974,7 +4456,14 @@ class LanguageQuizGUI:
                 num_questions = len(self.quiz_results)
                 avg_score = (total_points / (num_questions * 10)) * 100 if num_questions > 0 else 0
                 
+                # 📝 Xác định loại bài chi tiết
                 quiz_lang = self._get_quiz_language_code()
+                quiz_type_text = "Test từ vựng" if self.quiz_type_str == "meaning" else "Dịch câu"
+                if self.test_mode == 1:
+                    test_type_full = f"Voice - {quiz_type_text} → {quiz_lang}"
+                else:
+                    test_type_full = f"Voice - {quiz_type_text} → VN"
+                
                 file_name_only = Path(self.selected_file).name if hasattr(self, 'selected_file') and self.selected_file else "Unknown"
                 
                 conn = sqlite3.connect('study_history.db')
@@ -3982,7 +4471,7 @@ class LanguageQuizGUI:
                 cursor.execute("""
                     INSERT INTO quiz_results (user_name, score, total_questions, language, file_name)
                     VALUES (?, ?, ?, ?, ?)
-                """, (user_name, avg_score, num_questions, quiz_lang, file_name_only))
+                """, (user_name, avg_score, num_questions, test_type_full, file_name_only))
                 conn.commit()
                 conn.close()
                 
@@ -4053,6 +4542,11 @@ class LanguageQuizGUI:
             num_questions = len(self.quiz_results)
             avg_score = (total_points / (num_questions * 10)) * 100 if num_questions > 0 else 0
             
+            # 📊 Thống kê đúng/sai chi tiết
+            correct_count = sum(1 for r in self.quiz_results if r.get("score", 0) >= 8)
+            wrong_count = num_questions - correct_count
+            partial_count = sum(1 for r in self.quiz_results if 0 < r.get("score", 0) < 8)
+            
             if avg_score >= 90:
                 grade = "A - Xuất sắc 🌟"
             elif avg_score >= 80:
@@ -4066,6 +4560,7 @@ class LanguageQuizGUI:
             
             # Lấy thông tin file và phạm vi câu hỏi
             file_name = os.path.basename(self.selected_file) if hasattr(self, 'selected_file') and self.selected_file else "Unknown"
+            sheet_name = self.sheet_combo.get() if hasattr(self, 'sheet_combo') else "Sheet1"
             start_q = self.start_question_var.get()
             end_q = self.end_question_var.get()
             
@@ -4089,26 +4584,31 @@ class LanguageQuizGUI:
 👤 **Học sinh:** {user_name}
 🕐 **Thời gian:** {timestamp}
 📁 **File:** {file_name}
+� **Sheet:** {sheet_name}
 📝 **Phạm vi:** từ câu {start_q} đến câu {end_q}
 ✍️ **Loại bài:** {test_type}
 
 📈 **TỔNG HỢP:**
+   ✅ **Đúng: {correct_count}/{num_questions} câu**
+   ❌ **Sai: {wrong_count}/{num_questions} câu**
+   ⚠️ **Gần đúng: {partial_count} câu**
+   
    • Điểm trung bình: **{avg_score:.1f}/100**
    • Xếp loại: **{grade}**
    • Tổng điểm: **{total_points}/{num_questions * 10}**
 
-📋 **CHI TIẾT ({num_questions} câu):**
+📋 **CÁC CÂU SAI ({wrong_count} câu):**
 """
             
-            # Thêm 5 câu đầu tiên
-            for idx, result in enumerate(self.quiz_results[:5], 1):
-                question_num = result.get('question_num', idx)
-                score = result.get('score', 0)
-                emoji = "✅" if score >= 8 else "⚠️" if score >= 5 else "❌"
-                message_content += f"\n{emoji} **#{question_num}** {result['question']}: {score}/10"
+            # Chỉ liệt kê số thứ tự các câu sai (theo thứ tự Excel)
+            wrong_results = [r for r in self.quiz_results if r.get('score', 0) < 8]
             
-            if num_questions > 5:
-                message_content += f"\n... và {num_questions - 5} câu khác"
+            if wrong_results:
+                # Lấy danh sách số câu sai, sắp xếp theo thứ tự
+                wrong_nums = sorted([r.get('question_num', '?') for r in wrong_results])
+                message_content += f"\n❌ Câu: {', '.join(map(str, wrong_nums))}"
+            else:
+                message_content += "\n🎉 **Tất cả đều đúng! Xuất sắc!**"
             
             # Chụp ảnh từ camera
             photo_data = None
@@ -4369,7 +4869,8 @@ class LanguageQuizGUI:
                     
                     tts.save(temp_path)
                     
-                    mixer.init()
+                    if not mixer.get_init():
+                        mixer.init()
                     mixer.music.load(temp_path)
                     mixer.music.play()
                     
@@ -4377,7 +4878,7 @@ class LanguageQuizGUI:
                         import time
                         time.sleep(0.1)
                     
-                    mixer.quit()
+                    mixer.music.unload()
                     os.unlink(temp_path)
             except Exception as e:
                 print(f"⚠️ TTS error: {e}")
@@ -4422,7 +4923,8 @@ class LanguageQuizGUI:
                     
                     tts.save(temp_path)
                     
-                    mixer.init()
+                    if not mixer.get_init():
+                        mixer.init()
                     mixer.music.load(temp_path)
                     mixer.music.play()
                     
@@ -4430,7 +4932,7 @@ class LanguageQuizGUI:
                         import time
                         time.sleep(0.1)
                     
-                    mixer.quit()
+                    mixer.music.unload()
                     os.unlink(temp_path)
             except Exception as e:
                 print(f"⚠️ Practice TTS error: {e}")
@@ -4550,11 +5052,85 @@ class LanguageQuizGUI:
             self.user_settings["practice_file"] = file_path
             self._save_settings()
     
+    def _ask_user_name_dialog(self):
+        """👤 Dialog hỏi tên học sinh với icon"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("🎓 Tên học sinh")
+        dialog.geometry("450x550")
+        dialog.resizable(False, False)
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # Center dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (350 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (150 // 2)
+        dialog.geometry(f"+{x}+{y}")
+        
+        # Set icon if available
+        try:
+            icon_path = Path(__file__).parent / "logo.ico"
+            if icon_path.exists():
+                dialog.iconbitmap(str(icon_path))
+        except:
+            pass
+        
+        result = {"name": None}
+        
+        # Content frame
+        frame = ttk.Frame(dialog, padding=20)
+        frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Label with emoji
+        ttk.Label(frame, text="👤 Nhập tên của bạn:", font=("Segoe UI", 11)).pack(anchor=tk.W)
+        
+        # Entry
+        name_var = tk.StringVar(value=self.user_settings.get("last_user", ""))
+        name_entry = ttk.Entry(frame, textvariable=name_var, font=("Segoe UI", 12), width=30)
+        name_entry.pack(fill=tk.X, pady=10)
+        name_entry.focus_set()
+        name_entry.select_range(0, tk.END)
+        
+        def on_ok():
+            result["name"] = name_var.get().strip()
+            if not result["name"]:
+                messagebox.showwarning("Cảnh báo", "❌ Vui lòng nhập tên!", parent=dialog)
+                return
+            dialog.destroy()
+        
+        def on_cancel():
+            result["name"] = None
+            dialog.destroy()
+        
+        # Bind Enter key
+        name_entry.bind('<Return>', lambda e: on_ok())
+        dialog.bind('<Escape>', lambda e: on_cancel())
+        
+        # Buttons
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack(fill=tk.X, pady=(10, 0))
+        
+        ttk.Button(btn_frame, text="✅ OK", command=on_ok, width=12).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="❌ Hủy", command=on_cancel, width=12).pack(side=tk.LEFT, padx=5)
+        
+        dialog.wait_window()
+        return result["name"]
+    
     def _start_practice_quiz(self):
         """Bắt đầu Practice Quiz với Multiple Choice"""
         if not hasattr(self, 'practice_selected_file'):
             messagebox.showerror("Lỗi", "❌ Vui lòng chọn file Excel!")
             return
+        
+        # 👤 Hỏi tên người test - Custom dialog với icon
+        user_name = self._ask_user_name_dialog()
+        if not user_name or not user_name.strip():
+            return
+        
+        self.practice_user_name = user_name.strip()
+        # Lưu tên để dùng lần sau
+        self.user_settings["last_user"] = self.practice_user_name
+        self._save_settings()
         
         # Read data
         try:
@@ -4578,7 +5154,39 @@ class LanguageQuizGUI:
             messagebox.showerror("Lỗi", f"❌ Khoảng không hợp lệ!\n\nTổng số câu: {len(data)}")
             return
         
-        self.practice_questions = data[start_idx:end_idx]
+        # Get quiz type
+        quiz_type = self.practice_quiz_type_var.get() if hasattr(self, 'practice_quiz_type_var') else "meaning"
+        
+        # Filter data based on quiz type - chỉ lấy row có đầy đủ dữ liệu
+        selected_data = data[start_idx:end_idx]
+        filtered_data = []
+        for q in selected_data:
+            if quiz_type == "meaning":
+                # Cần có word và meaning
+                if q.get('word', '').strip() and q.get('meaning', '').strip():
+                    filtered_data.append(q)
+            else:  # example (dịch câu)
+                # Cần có example_en và example_vi
+                if q.get('example_en', '').strip() and q.get('example_vi', '').strip():
+                    filtered_data.append(q)
+        
+        if not filtered_data:
+            if quiz_type == "meaning":
+                messagebox.showerror("Lỗi", 
+                    f"❌ Không có câu hỏi hợp lệ!\n\n"
+                    f"Quiz type: Test từ vựng\n"
+                    f"Cần có cột 'word' và 'meaning' không rỗng.")
+            else:
+                messagebox.showerror("Lỗi", 
+                    f"❌ Không có câu hỏi hợp lệ!\n\n"
+                    f"Quiz type: Dịch câu\n"
+                    f"Cần có cột 'example_en' và 'example_vi' không rỗng.")
+            return
+        
+        if len(filtered_data) < len(selected_data):
+            print(f"⚠️ Practice: Lọc {len(selected_data) - len(filtered_data)} câu không có đủ dữ liệu")
+        
+        self.practice_questions = filtered_data
         self.practice_current_idx = 0
         self.practice_results = []
         
@@ -4718,9 +5326,9 @@ class LanguageQuizGUI:
         
         # Enable pause button
         self.practice_pause_btn.config(state=tk.NORMAL)
-        # 🔊 Auto TTS - Đọc câu hỏi khi hiển thị (tùy chọn)
-        # Uncomment dòng dưới nếu muốn tự động đọc:
-        # self._speak_practice_question()
+        
+        # 🔊 Auto TTS - Tự động đọc câu hỏi khi hiển thị
+        self._speak_practice_question()
     
     def _practice_submit_answer(self, choice):
         """Xử lý khi chọn đáp án A/B/C/D"""
@@ -4876,28 +5484,274 @@ class LanguageQuizGUI:
         self.root.after(1000, self._update_practice_timer)
     
     def _show_practice_results(self):
-        """Hiển thị kết quả Practice Quiz"""
+        """Hiển thị kết quả Practice Quiz + Lưu + Gửi Discord"""
         if not self.practice_results:
             return
         
         total_score = sum(r['score'] for r in self.practice_results)
         total_questions = len(self.practice_results)
         correct_count = sum(1 for r in self.practice_results if r['is_correct'])
+        wrong_count = total_questions - correct_count
+        avg_score = (total_score / (total_questions * 10)) * 100 if total_questions > 0 else 0
+        
+        # Lấy thông tin file/sheet
+        file_name = Path(self.practice_selected_file).name if hasattr(self, 'practice_selected_file') else "Unknown"
+        sheet_name = self.practice_sheet_combo.get() if hasattr(self, 'practice_sheet_combo') else "Sheet1"
+        
+        # Lấy tên người test
+        user_name = getattr(self, 'practice_user_name', "Unknown")
+        
+        # Lấy loại quiz (Nghĩa từ / Dịch câu)
+        quiz_type = self.practice_quiz_type_var.get() if hasattr(self, 'practice_quiz_type_var') else "meaning"
+        quiz_type_text = "Test từ vựng" if quiz_type == "meaning" else "Dịch câu"
+        
+        # Timestamp
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Xếp loại
+        if avg_score >= 90:
+            grade = "A - Xuất sắc 🌟"
+        elif avg_score >= 80:
+            grade = "B - Tốt 👍"
+        elif avg_score >= 70:
+            grade = "C - Khá 👌"
+        elif avg_score >= 60:
+            grade = "D - Đạt ✓"
+        else:
+            grade = "F - Chưa đạt 📚"
         
         result_msg = f"""
 🎉 HOÀN THÀNH PRACTICE QUIZ!
 
+� Học sinh: {user_name}
+�📁 File: {file_name}
+📑 Sheet: {sheet_name}
+✍️ Loại bài: {quiz_type_text}
+
 📊 Kết quả:
    • Tổng số câu: {total_questions}
    • Đúng: {correct_count}/{total_questions}
+   • Sai: {wrong_count}/{total_questions}
    • Điểm: {total_score}/{total_questions * 10}
-   • Độ chính xác: {correct_count/total_questions*100:.1f}%
+   • Độ chính xác: {avg_score:.1f}%
+   • Xếp loại: {grade}
         """
         
-        messagebox.showinfo("Kết quả", result_msg)
+        # 🎊 Hiển thị popup feedback động viên
+        feedback_messages = {
+            "excellent": "🌟 Xuất sắc! Bạn làm rất tốt!",
+            "good": "👍 Tốt lắm! Bạn đang tiến bộ!",
+            "pass": "👌 Khá đấy! Hãy tiếp tục cố gắng!",
+            "fail": "📚 Cần cố gắng hơn! Đừng bỏ cuộc!"
+        }
+        
+        if avg_score >= 90:
+            feedback_key = "excellent"
+            color = "#2E7D32"
+        elif avg_score >= 75:
+            feedback_key = "good"
+            color = "#1976D2"
+        elif avg_score >= 60:
+            feedback_key = "pass"
+            color = "#F57C00"
+        else:
+            feedback_key = "fail"
+            color = "#D84315"
+        
+        feedback_text = feedback_messages[feedback_key]
+        
+        # Tạo popup feedback
+        feedback_popup = tk.Toplevel(self.root)
+        feedback_popup.title("🎊 Kết quả Practice Quiz")
+        feedback_popup.geometry("450x280")
+        feedback_popup.resizable(False, False)
+        feedback_popup.transient(self.root)
+        
+        try:
+            if self.icon_path.exists():
+                feedback_popup.iconbitmap(str(self.icon_path))
+        except:
+            pass
+        
+        popup_frame = ttk.Frame(feedback_popup, padding=20)
+        popup_frame.pack(fill=tk.BOTH, expand=True)
+        
+        ttk.Label(
+            popup_frame, 
+            text=feedback_text,
+            font=("Segoe UI", 18, "bold"),
+            foreground=color,
+            justify=tk.CENTER
+        ).pack(pady=(0, 15))
+        
+        info_text = f"""👤 {user_name}
+📊 Điểm: {avg_score:.1f}% | {grade}
+✅ Đúng: {correct_count}/{total_questions} | ❌ Sai: {wrong_count}/{total_questions}"""
+        
+        ttk.Label(
+            popup_frame,
+            text=info_text,
+            font=("Segoe UI", 11),
+            justify=tk.CENTER
+        ).pack(pady=10)
+        
+        ttk.Button(
+            popup_frame,
+            text="✓ OK",
+            command=feedback_popup.destroy,
+            width=15
+        ).pack(pady=15)
+        
+        # Phát TTS feedback (optional - không crash nếu lỗi)
+        def play_feedback_safe():
+            try:
+                if hasattr(self, 'voice_manager') and self.voice_manager:
+                    clean_text = feedback_text.replace("🌟", "").replace("👍", "").replace("👌", "").replace("📚", "").strip()
+                    self.voice_manager.voice_manager.speak_google_tts(clean_text, language="vi")
+            except Exception as e:
+                print(f"⚠️ Practice TTS feedback error: {e}")
+        
+        try:
+            threading.Thread(target=play_feedback_safe, daemon=True).start()
+        except:
+            pass
+        
+        # 💾 Lưu kết quả vào leaderboard
+        try:
+            import sqlite3
+            conn = sqlite3.connect('study_history.db')
+            cursor = conn.cursor()
+            
+            # Lấy phạm vi câu hỏi
+            start_q = self.practice_start_var.get() if hasattr(self, 'practice_start_var') else 1
+            end_q = self.practice_end_var.get() if hasattr(self, 'practice_end_var') else total_questions
+            
+            # Danh sách câu sai
+            wrong_results = [r for r in self.practice_results if not r.get('is_correct', True)]
+            wrong_nums = sorted([r.get('question_num', '?') for r in wrong_results])
+            wrong_list = ', '.join(map(str, wrong_nums)) if wrong_nums else ""
+            
+            cursor.execute("""
+                INSERT INTO quiz_results (user_name, score, total_questions, language, file_name, 
+                                         correct_count, wrong_count, wrong_questions, quiz_range, sheet_name)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (user_name, avg_score, total_questions, f"Practice - {quiz_type_text}", file_name,
+                  correct_count, wrong_count, wrong_list, f"{start_q}-{end_q}", sheet_name))
+            conn.commit()
+            conn.close()
+            
+            # Refresh leaderboard
+            self._load_leaderboard()
+            print(f"✅ Practice: Đã lưu điểm {avg_score:.1f} vào leaderboard")
+        except Exception as e:
+            print(f"⚠️ Practice: Lỗi lưu leaderboard: {e}")
+        
+        # 📤 Gửi Discord
+        self._send_practice_to_discord(user_name, file_name, sheet_name, timestamp, total_questions, 
+                                       correct_count, wrong_count, avg_score, grade, total_score, quiz_type_text)
         
         # Reset UI - Use Label instead of ScrolledText
         self.practice_question_label.config(text="Đã hoàn thành! Nhấn 'Bắt Đầu Practice' để làm lại.")
+    
+    def _send_practice_to_discord(self, user_name, file_name, sheet_name, timestamp, total_questions, 
+                                  correct_count, wrong_count, avg_score, grade, total_score, quiz_type_text):
+        """📤 Gửi kết quả Practice Quiz lên Discord"""
+        try:
+            import requests
+            import os
+            from dotenv import load_dotenv
+            
+            load_dotenv()
+            webhook_url = os.getenv('DISCORD_WEBHOOK_URL')
+            
+            if not webhook_url:
+                print("⚠️ Practice: DISCORD_WEBHOOK_URL không tìm thấy")
+                return
+            
+            # Lấy phạm vi câu hỏi
+            start_q = self.practice_start_var.get() if hasattr(self, 'practice_start_var') else 1
+            end_q = self.practice_end_var.get() if hasattr(self, 'practice_end_var') else total_questions
+            
+            # Danh sách câu sai
+            wrong_results = [r for r in self.practice_results if not r.get('is_correct', True)]
+            wrong_nums = sorted([r.get('question_num', '?') for r in wrong_results])
+            
+            message_content = f"""
+📝 **KẾT QUẢ KIỂM TRA TRẮC NGHIỆM**
+═══════════════════════════════════════
+👤 **Học sinh:** {user_name}
+🕐 **Thời gian:** {timestamp}
+📁 **File:** {file_name}
+📑 **Sheet:** {sheet_name}
+📋 **Phạm vi:** từ câu {start_q} đến câu {end_q}
+✍️ **Loại bài:** Practice ABC - {quiz_type_text}
+
+📈 **TỔNG HỢP:**
+   ✅ **Đúng: {correct_count}/{total_questions} câu**
+   ❌ **Sai: {wrong_count}/{total_questions} câu**
+   
+   • Điểm trung bình: **{avg_score:.1f}/100**
+   • Xếp loại: **{grade}**
+   • Tổng điểm: **{total_score}/{total_questions * 10}**
+
+📋 **CÁC CÂU SAI ({wrong_count} câu):**
+"""
+            
+            if wrong_nums:
+                message_content += f"\n❌ Câu: {', '.join(map(str, wrong_nums))}"
+            else:
+                message_content += "\n🎉 **Tất cả đều đúng! Xuất sắc!**"
+            
+            # Chụp ảnh từ camera
+            photo_data = None
+            try:
+                import cv2
+                
+                # Lấy camera index
+                cam_idx = 0
+                if hasattr(self, 'camera_indices') and self.camera_indices:
+                    if hasattr(self, 'camera_combo'):
+                        combo_idx = self.camera_combo.current()
+                        if combo_idx >= 0 and combo_idx < len(self.camera_indices):
+                            cam_idx = self.camera_indices[combo_idx]
+                
+                cap = cv2.VideoCapture(cam_idx)
+                if cap.isOpened():
+                    # Đọc vài frame để camera ổn định
+                    for _ in range(5):
+                        cap.read()
+                    
+                    ret, frame = cap.read()
+                    if ret:
+                        # Convert to JPEG
+                        _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
+                        photo_data = buffer.tobytes()
+                        print("✅ Practice: Đã chụp ảnh từ camera")
+                    cap.release()
+            except Exception as cam_err:
+                print(f"⚠️ Practice: Không thể chụp ảnh: {cam_err}")
+            
+            # Gửi lên Discord
+            import io
+            files = {}
+            if photo_data:
+                files['file'] = ('photo.jpg', io.BytesIO(photo_data), 'image/jpeg')
+            
+            payload = {
+                'content': message_content,
+                'username': 'Practice Bot 📝'
+            }
+            
+            response = requests.post(webhook_url, data=payload, files=files if files else None)
+            
+            if response.status_code in [200, 204]:
+                print(f"✅ Practice: Đã gửi kết quả lên Discord{' (+ảnh)' if photo_data else ''}")
+            else:
+                print(f"⚠️ Practice Discord failed: {response.status_code}")
+                
+        except Exception as e:
+            print(f"⚠️ Practice: Lỗi gửi Discord: {e}")
     
     def export_smart_review_stats(self):
         """📊 Export Smart Review statistics to Excel"""
@@ -5253,7 +6107,6 @@ class LanguageQuizGUI:
             cursor = conn.cursor()
             
             # Check if we have any quiz results saved
-            # Since we don't have a quiz_results table, we'll show a placeholder
             cursor.execute("""
                 SELECT COUNT(*) FROM sqlite_master 
                 WHERE type='table' AND name='quiz_results'
@@ -5262,7 +6115,7 @@ class LanguageQuizGUI:
             table_exists = cursor.fetchone()[0]
             
             if not table_exists:
-                # Create the table if it doesn't exist
+                # Create the table if it doesn't exist (with new columns)
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS quiz_results (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -5271,9 +6124,32 @@ class LanguageQuizGUI:
                         total_questions INTEGER,
                         date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         language TEXT,
-                        file_name TEXT
+                        file_name TEXT,
+                        correct_count INTEGER DEFAULT 0,
+                        wrong_count INTEGER DEFAULT 0,
+                        wrong_questions TEXT DEFAULT '',
+                        quiz_range TEXT DEFAULT '',
+                        sheet_name TEXT DEFAULT ''
                     )
                 """)
+                conn.commit()
+            else:
+                # Add new columns if they don't exist
+                try:
+                    cursor.execute("ALTER TABLE quiz_results ADD COLUMN correct_count INTEGER DEFAULT 0")
+                except: pass
+                try:
+                    cursor.execute("ALTER TABLE quiz_results ADD COLUMN wrong_count INTEGER DEFAULT 0")
+                except: pass
+                try:
+                    cursor.execute("ALTER TABLE quiz_results ADD COLUMN wrong_questions TEXT DEFAULT ''")
+                except: pass
+                try:
+                    cursor.execute("ALTER TABLE quiz_results ADD COLUMN quiz_range TEXT DEFAULT ''")
+                except: pass
+                try:
+                    cursor.execute("ALTER TABLE quiz_results ADD COLUMN sheet_name TEXT DEFAULT ''")
+                except: pass
                 conn.commit()
             
             # Get top 15 unique users with highest average scores
@@ -5326,6 +6202,610 @@ class LanguageQuizGUI:
         except Exception as e:
             self.leaderboard_list.delete(0, tk.END)
             self.leaderboard_list.insert(tk.END, f"  ⚠️ Lỗi: {str(e)}")
+    
+    def _show_leaderboard_detail(self, event=None):
+        """Hiển thị chi tiết khi double-click vào leaderboard"""
+        selection = self.leaderboard_list.curselection()
+        if not selection:
+            return
+        
+        idx = selection[0]
+        # Skip header rows (0, 1)
+        if idx <= 1:
+            return
+        
+        # Get user name from selected row
+        line = self.leaderboard_list.get(idx)
+        if not line or '#' not in line:
+            return
+        
+        try:
+            # Parse user name from line format: "  #1   tephoung anh  90.0  100     5"
+            parts = line.split()
+            if len(parts) < 3:
+                return
+            # parts[0] = #1, parts[1] = name (có thể nhiều từ), parts[-3] = avg, parts[-2] = best, parts[-1] = tests
+            user_name = ' '.join(parts[1:-3])
+            
+            # Query database for user's history
+            conn = sqlite3.connect('study_history.db')
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT 
+                    user_name, score, total_questions, date, language, file_name,
+                    correct_count, wrong_count, wrong_questions, quiz_range, sheet_name
+                FROM quiz_results
+                WHERE user_name = ?
+                ORDER BY date DESC
+                LIMIT 20
+            """, (user_name,))
+            
+            results = cursor.fetchall()
+            conn.close()
+            
+            if not results:
+                messagebox.showinfo("Thông tin", f"Không tìm thấy lịch sử của {user_name}")
+                return
+            
+            # Create detail dialog
+            dialog = tk.Toplevel(self.root)
+            dialog.title(f"📊 Chi tiết - {user_name}")
+            dialog.geometry("600x500")
+            dialog.transient(self.root)
+            
+            # Set icon
+            try:
+                icon_path = Path(__file__).parent / "logo.ico"
+                if icon_path.exists():
+                    dialog.iconbitmap(str(icon_path))
+            except:
+                pass
+            
+            # Content
+            frame = ttk.Frame(dialog, padding=15)
+            frame.pack(fill=tk.BOTH, expand=True)
+            
+            # Header
+            ttk.Label(frame, text=f"🏆 Lịch sử kiểm tra của {user_name}", 
+                     font=("Segoe UI", 14, "bold")).pack(anchor=tk.W, pady=(0, 10))
+            
+            # Stats summary
+            total_tests = len(results)
+            avg_score = sum(r[1] for r in results) / total_tests if total_tests > 0 else 0
+            best_score = max(r[1] for r in results) if results else 0
+            
+            stats_text = f"📈 Tổng số bài: {total_tests} | Điểm TB: {avg_score:.1f} | Điểm cao nhất: {best_score:.1f}"
+            ttk.Label(frame, text=stats_text, font=("Segoe UI", 10)).pack(anchor=tk.W, pady=(0, 10))
+            
+            # Scrolled text for details
+            text_frame = ttk.Frame(frame)
+            text_frame.pack(fill=tk.BOTH, expand=True)
+            
+            text = scrolledtext.ScrolledText(text_frame, font=("Consolas", 10), wrap=tk.WORD)
+            text.pack(fill=tk.BOTH, expand=True)
+            
+            # Display each result
+            for row in results:
+                user, score, total_q, date, lang, file_name, correct, wrong, wrong_qs, quiz_range, sheet = row
+                
+                # Handle None values
+                correct = correct or 0
+                wrong = wrong or 0
+                wrong_qs = wrong_qs or ""
+                quiz_range = quiz_range or "?"
+                sheet = sheet or "?"
+                
+                text.insert(tk.END, f"\n{'='*55}\n")
+                text.insert(tk.END, f"📅 {date}\n")
+                text.insert(tk.END, f"📁 File: {file_name}\n")
+                text.insert(tk.END, f"📑 Sheet: {sheet}\n")
+                text.insert(tk.END, f"✍️ Loại: {lang}\n")
+                text.insert(tk.END, f"📋 Phạm vi: câu {quiz_range}\n\n")
+                text.insert(tk.END, f"📊 Điểm: {score:.1f}/100\n")
+                text.insert(tk.END, f"✅ Đúng: {correct}/{total_q} câu\n")
+                text.insert(tk.END, f"❌ Sai: {wrong}/{total_q} câu\n")
+                if wrong_qs:
+                    text.insert(tk.END, f"📍 Câu sai: {wrong_qs}\n")
+            
+            text.config(state=tk.DISABLED)
+            
+            # Close button
+            ttk.Button(frame, text="❌ Đóng", command=dialog.destroy, width=15).pack(pady=10)
+            
+        except Exception as e:
+            print(f"⚠️ Leaderboard detail error: {e}")
+            messagebox.showerror("Lỗi", f"Không thể hiển thị chi tiết:\n{e}")
+    
+    # ═════════════════════════════════════════════════════════════════════
+    # 🎤 PRONUNCIATION PRACTICE FUNCTIONS
+    # ═════════════════════════════════════════════════════════════════════
+    
+    def _pron_save_settings(self):
+        """Save pronunciation settings to user_settings"""
+        try:
+            if hasattr(self, 'pron_voice_var'):
+                self.user_settings["pron_voice"] = self.pron_voice_var.get()
+            if hasattr(self, 'pron_speed_var'):
+                self.user_settings["pron_speed"] = self.pron_speed_var.get()
+            if hasattr(self, 'pron_quiz_type_var'):
+                self.user_settings["pron_quiz_type"] = self.pron_quiz_type_var.get()
+            if hasattr(self, 'pron_test_mode_var'):
+                self.user_settings["pron_test_mode"] = self.pron_test_mode_var.get()
+            if hasattr(self, 'pron_start_var'):
+                self.user_settings["pron_start"] = self.pron_start_var.get()
+            if hasattr(self, 'pron_end_var'):
+                self.user_settings["pron_end"] = self.pron_end_var.get()
+            self._save_settings()
+        except Exception as e:
+            print(f"[INFO] Error saving pronunciation settings: {e}")
+    
+    def _pron_select_file(self):
+        """Chọn file cho Pronunciation Practice"""
+        from tkinter import filedialog
+        file_path = filedialog.askopenfilename(
+            title="Chọn File Excel",
+            filetypes=[("Excel files", "*.xlsx *.xls"), ("All files", "*.*")]
+        )
+        if file_path:
+            self.pron_selected_file = file_path
+            self.pron_file_label.config(
+                text=file_path.split("/")[-1].split("\\")[-1],
+                foreground="green"
+            )
+            # Save file path to settings
+            self.user_settings["pron_file"] = file_path
+            
+            # Load sheets
+            try:
+                import openpyxl
+                wb = openpyxl.load_workbook(file_path)
+                sheets = wb.sheetnames
+                self.pron_sheet_combo['values'] = sheets
+                if sheets:
+                    # Restore last used sheet or use first
+                    last_sheet = self.user_settings.get("pron_sheet", sheets[0])
+                    if last_sheet in sheets:
+                        self.pron_sheet_combo.set(last_sheet)
+                    else:
+                        self.pron_sheet_combo.current(0)
+                    self._pron_update_questions()
+            except Exception as e:
+                messagebox.showerror("Lỗi", f"❌ Không thể đọc file:\n{e}")
+            finally:
+                self._save_settings()
+    
+    def _pron_update_questions(self):
+        """Update số câu hỏi khi chọn sheet"""
+        if not hasattr(self, 'pron_selected_file'):
+            return
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(self.pron_selected_file, data_only=True)
+            sheet_name = self.pron_sheet_combo.get()
+            if sheet_name:
+                ws = wb[sheet_name]
+                count = 0
+                for row in ws.iter_rows(min_row=2):
+                    if row[0].value:
+                        count += 1
+                self.pron_end_var.set(count if count > 0 else 50)
+                # Save sheet name to settings
+                self.user_settings["pron_sheet"] = sheet_name
+                self._save_settings()
+        except:
+            pass
+    
+    def _start_pronunciation_practice(self):
+        """Bắt đầu Pronunciation Practice"""
+        if not hasattr(self, 'pron_selected_file'):
+            messagebox.showerror("Lỗi", "❌ Vui lòng chọn file Excel!")
+            return
+        
+        # Save current settings
+        self.user_settings["pron_voice"] = self.pron_voice_var.get()
+        self.user_settings["pron_speed"] = self.pron_speed_var.get()
+        self.user_settings["pron_quiz_type"] = self.pron_quiz_type_var.get()
+        self.user_settings["pron_test_mode"] = self.pron_test_mode_var.get()
+        self.user_settings["pron_start"] = self.pron_start_var.get()
+        self.user_settings["pron_end"] = self.pron_end_var.get()
+        self._save_settings()
+        
+        # 👤 Hỏi tên người test
+        user_name = self._ask_user_name_dialog()
+        if not user_name or not user_name.strip():
+            return
+        
+        self.pron_user_name = user_name.strip()
+        self.user_settings["last_user"] = self.pron_user_name
+        self._save_settings()
+        
+        # Load data
+        try:
+            from pathlib import Path
+            import openpyxl
+            
+            wb = openpyxl.load_workbook(self.pron_selected_file)
+            ws = wb[self.pron_sheet_combo.get()]
+            
+            # Detect language
+            filename = Path(self.pron_selected_file).name.lower()
+            if 'nhat' in filename or 'japanese' in filename or 'ja' in filename:
+                self.pron_language = "Japanese"
+            elif 'trung' in filename or 'chinese' in filename or 'zh' in filename:
+                self.pron_language = "Chinese"
+            else:
+                self.pron_language = "English"
+            
+            # Check header to detect 'No.' column
+            header_row = list(ws.iter_rows(min_row=1, max_row=1, values_only=True))[0]
+            has_no_column = False
+            word_col = 0
+            meaning_col = 1
+            example_en_col = 2
+            example_vn_col = 3
+            
+            if header_row and str(header_row[0]).lower() in ["no.", "no", "#", "stt"]:
+                has_no_column = True
+                word_col = 1
+                meaning_col = 2
+                example_en_col = 3
+                example_vn_col = 4
+            
+            # Read data
+            data = []
+            seen_words = set()
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                if not row or not row[word_col]:
+                    continue
+                
+                word = str(row[word_col]).strip() if row[word_col] else ""
+                meaning = str(row[meaning_col]).strip() if len(row) > meaning_col and row[meaning_col] else ""
+                example_en = str(row[example_en_col]).strip() if len(row) > example_en_col and row[example_en_col] else ""
+                example_vn = str(row[example_vn_col]).strip() if len(row) > example_vn_col and row[example_vn_col] else ""
+                
+                # Skip empty or duplicate
+                if not word or word in seen_words:
+                    continue
+                seen_words.add(word)
+                
+                # Only include relevant data
+                if self.pron_quiz_type_var.get() == "meaning" and not meaning:
+                    continue
+                if self.pron_quiz_type_var.get() == "example" and not example_en:
+                    continue
+                
+                data.append({
+                    "excel_row": idx - 1,
+                    "word": word,
+                    "meaning": meaning,
+                    "example_en": example_en,
+                    "example_vn": example_vn,
+                })
+            
+            if not data:
+                messagebox.showerror("Lỗi", "❌ Không có dữ liệu trong file!")
+                return
+            
+            # Get range
+            start_idx = max(0, self.pron_start_var.get() - 1)
+            end_idx = min(len(data), self.pron_end_var.get())
+            
+            self.pron_questions = data[start_idx:end_idx]
+            self.pron_current_idx = 0
+            self.pron_results = []
+            self.pron_total_correct = 0
+            self.pron_total_wrong = 0
+            
+            # Start pronunciation practice window
+            self._create_pronunciation_practice_window()
+            
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"❌ Lỗi:\n{e}")
+    
+    def _create_pronunciation_practice_window(self):
+        """Tạo cửa sổ luyện phát âm"""
+        # Create top-level window
+        self.pron_practice_window = tk.Toplevel(self.root)
+        self.pron_practice_window.title(f"🎤 Luyện Phát Âm - {self.pron_user_name}")
+        self.pron_practice_window.geometry("900x700")
+        
+        # Add icon to practice window
+        if self.icon_path.exists():
+            try:
+                self.pron_practice_window.iconbitmap(str(self.icon_path))
+            except:
+                pass
+        
+        # Main container
+        main_frame = ttk.Frame(self.pron_practice_window)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Header info
+        header_frame = ttk.Frame(main_frame)
+        header_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Label(header_frame, text=f"👤 {self.pron_user_name} | 📁 {Path(self.pron_selected_file).name} | 🌐 {self.pron_language}", 
+                 font=("Segoe UI", 10, "bold")).pack(anchor=tk.W)
+        
+        # Progress bar
+        self.pron_progress_var = tk.IntVar(value=0)
+        progress_label = ttk.Label(header_frame, text="Tiến độ: 1/10", font=("Segoe UI", 9))
+        progress_label.pack(anchor=tk.W, pady=(5, 0))
+        self.pron_progress_label = progress_label
+        
+        progress_bar = ttk.Progressbar(header_frame, variable=self.pron_progress_var, maximum=100)
+        progress_bar.pack(fill=tk.X, pady=(5, 0))
+        self.pron_progress_bar = progress_bar
+        
+        # Content area - Question display
+        content_frame = ttk.LabelFrame(main_frame, text="📝 Câu Hỏi", padding=10)
+        content_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        
+        # Current word/sentence display
+        self.pron_question_display = tk.Label(
+            content_frame, 
+            text="",
+            font=("Segoe UI", 20, "bold"),
+            bg="lightblue",
+            fg="darkblue",
+            pady=20,
+            wraplength=700
+        )
+        self.pron_question_display.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        
+        # Show meaning/example
+        self.pron_meaning_display = tk.Label(
+            content_frame,
+            text="",
+            font=("Segoe UI", 12),
+            fg="gray",
+            justify=tk.LEFT,
+            wraplength=700
+        )
+        self.pron_meaning_display.pack(fill=tk.X, pady=5)
+        
+        # Feedback area
+        feedback_frame = ttk.LabelFrame(main_frame, text="💬 Kết Quả", padding=10)
+        feedback_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        
+        self.pron_feedback_text = scrolledtext.ScrolledText(
+            feedback_frame,
+            height=8,
+            width=80,
+            wrap=tk.WORD,
+            font=("Segoe UI", 10),
+            bg="lightyellow"
+        )
+        self.pron_feedback_text.pack(fill=tk.BOTH, expand=True)
+        self.pron_feedback_text.config(state=tk.DISABLED)
+        
+        # Control buttons
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X)
+        
+        ttk.Button(button_frame, text="🔊 Nghe lại", command=self._pron_repeat_sound).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="🎙️ Luyện phát âm", command=self._pron_record_pronunciation).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="✅ Tiếp theo", command=self._pron_next_question).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="❌ Dừng", command=self._pron_stop_practice).pack(side=tk.LEFT, padx=5)
+        
+        # Display first question
+        self._pron_display_current_question()
+    
+    def _pron_display_current_question(self):
+        """Hiển thị câu hỏi hiện tại"""
+        if self.pron_current_idx >= len(self.pron_questions):
+            self._pron_show_final_results()
+            return
+        
+        current = self.pron_questions[self.pron_current_idx]
+        question_num = self.pron_current_idx + 1
+        total = len(self.pron_questions)
+        
+        # Update progress
+        progress = int((question_num / total) * 100)
+        self.pron_progress_var.set(progress)
+        self.pron_progress_label.config(text=f"Tiến độ: {question_num}/{total}")
+        
+        # Update question display
+        question_text = f"{question_num}. {current['word']}"
+        self.pron_question_display.config(text=question_text)
+        
+        # Update meaning/example
+        if self.pron_quiz_type_var.get() == "meaning":
+            meaning_text = f"📚 Nghĩa: {current['meaning']}"
+        else:
+            meaning_text = f"📝 Ví dụ: {current['example_en']}\n🇻🇳 {current['example_vn']}"
+        
+        self.pron_meaning_display.config(text=meaning_text)
+        
+        # Clear feedback
+        self.pron_feedback_text.config(state=tk.NORMAL)
+        self.pron_feedback_text.delete(1.0, tk.END)
+        self.pron_feedback_text.insert(tk.END, f"✅ Sẵn sàng luyện câu {question_num}!\n\n1️⃣ Ấn '🔊 Nghe lại' để nghe từ/câu\n2️⃣ Ấn '🎙️ Luyện phát âm' để luyện\n3️⃣ Hệ thống sẽ so sánh phát âm\n4️⃣ Ấn '✅ Tiếp theo' để câu tiếp theo")
+        self.pron_feedback_text.config(state=tk.DISABLED)
+        
+        # Play the word immediately
+        self._pron_play_question_sound()
+    
+    def _pron_play_question_sound(self):
+        """Phát âm thanh câu hỏi"""
+        if self.pron_current_idx >= len(self.pron_questions):
+            return
+        
+        current = self.pron_questions[self.pron_current_idx]
+        word = current['word']
+        
+        # Determine text to speak
+        if self.pron_quiz_type_var.get() == "meaning":
+            speak_text = word  # Phát âm từ
+        else:
+            speak_text = current['example_en']  # Phát âm câu ví dụ
+        
+        # Speak using Polly
+        voice = "Joanna" if self.pron_voice_var.get() == "female" else "Matthew"
+        
+        # Map language
+        lang_map = {
+            "English": "en",
+            "Japanese": "ja",
+            "Chinese": "zh"
+        }
+        language = lang_map.get(self.pron_language, "en")
+        
+        threading.Thread(
+            target=lambda: self.voice_manager.voice_manager.speak_with_polly(speak_text, language=language, voice=voice),
+            daemon=True
+        ).start()
+    
+    def _pron_repeat_sound(self):
+        """Nghe lại câu hỏi"""
+        self._pron_play_question_sound()
+    
+    def _pron_record_pronunciation(self):
+        """Luyện phát âm - ghi âm phát âm của người dùng"""
+        if self.pron_current_idx >= len(self.pron_questions):
+            return
+        
+        current = self.pron_questions[self.pron_current_idx]
+        word = current['word']
+        
+        # Update feedback
+        self.pron_feedback_text.config(state=tk.NORMAL)
+        self.pron_feedback_text.delete(1.0, tk.END)
+        self.pron_feedback_text.insert(tk.END, "🎙️ Dang ghi am... hay phat am!")
+        self.pron_feedback_text.config(state=tk.DISABLED)
+        self.pron_practice_window.update()
+        
+        # Record user pronunciation in background
+        def record_and_compare():
+            try:
+                # Use correct method: listen_to_microphone
+                language = "en-US" if self.pron_language == "English" else "ja-JP" if self.pron_language == "Japanese" else "zh-CN"
+                user_text = self.voice_manager.voice_manager.listen_to_microphone(timeout=5, language=language, quiz_type="pronunciation")
+                
+                if not user_text:
+                    self.pron_feedback_text.config(state=tk.NORMAL)
+                    self.pron_feedback_text.delete(1.0, tk.END)
+                    self.pron_feedback_text.insert(tk.END, "Loi: Khong the ghi am. Hay kiem tra mic va thu lai!")
+                    self.pron_feedback_text.config(state=tk.DISABLED)
+                    return
+                
+                # Simple comparison: check if recognized text contains the word
+                user_text_lower = str(user_text).lower().strip()
+                word_lower = str(word).lower().strip()
+                
+                # Calculate similarity as percentage
+                from difflib import SequenceMatcher
+                similarity = SequenceMatcher(None, user_text_lower, word_lower).ratio() * 100
+                
+                # Determine result (threshold: 60% similarity)
+                is_correct = similarity >= 60
+                
+                # Update feedback
+                self._pron_display_feedback(similarity, is_correct, user_text)
+                
+                # Save result
+                result = {
+                    "question": f"{self.pron_current_idx + 1}. {word}",
+                    "similarity": similarity,
+                    "is_correct": is_correct
+                }
+                self.pron_results.append(result)
+                
+                if is_correct:
+                    self.pron_total_correct += 1
+                else:
+                    self.pron_total_wrong += 1
+                
+            except Exception as e:
+                self.pron_feedback_text.config(state=tk.NORMAL)
+                self.pron_feedback_text.delete(1.0, tk.END)
+                self.pron_feedback_text.insert(tk.END, f"❌ Lỗi ghi âm:\n{e}")
+                self.pron_feedback_text.config(state=tk.DISABLED)
+        
+        # Run recording in background
+        threading.Thread(target=record_and_compare, daemon=True).start()
+    
+    def _pron_display_feedback(self, similarity, is_correct, user_text=""):
+        """Hien thi phan hoi"""
+        current = self.pron_questions[self.pron_current_idx]
+        
+        # Determine star rating
+        if similarity >= 90:
+            stars = "[3 stars] Xuat sac!"
+        elif similarity >= 75:
+            stars = "[2 stars] Tot!"
+        elif similarity >= 60:
+            stars = "[1 star] Co cai thien"
+        else:
+            stars = "[0 stars] Tiep tuc luyen"
+        
+        feedback = f"""{'[OK] DUNG!' if is_correct else '[FAIL] SAI!'}
+
+Diem tuong dong: {similarity:.1f}%
+Muc do: {stars}
+
+{'Hoan hao! Tiep tuc nhe!' if is_correct else f'Goi y: Ban phat am "{current["word"]}" can nhu am thanh da phat'}
+
+Recognized: {user_text}
+
+An 'Tiep theo' de sang cau tiep theo hoac 'Luyen phat am' de luyen lai."""
+        
+        self.pron_feedback_text.config(state=tk.NORMAL)
+        self.pron_feedback_text.delete(1.0, tk.END)
+        self.pron_feedback_text.insert(tk.END, feedback)
+        self.pron_feedback_text.config(state=tk.DISABLED)
+    
+    def _pron_next_question(self):
+        """Sang câu tiếp theo"""
+        self.pron_current_idx += 1
+        self._pron_display_current_question()
+    
+    def _pron_stop_practice(self):
+        """Dừng luyện phát âm"""
+        if messagebox.askyesno("Xác nhận", "Dừng luyện phát âm?"):
+            if hasattr(self, 'pron_practice_window') and self.pron_practice_window.winfo_exists():
+                self._pron_show_final_results()
+    
+    def _pron_show_final_results(self):
+        """Hiển thị kết quả cuối cùng"""
+        total = len(self.pron_results)
+        correct = self.pron_total_correct
+        wrong = self.pron_total_wrong
+        accuracy = (correct / total * 100) if total > 0 else 0
+        
+        # Close practice window
+        if hasattr(self, 'pron_practice_window') and self.pron_practice_window.winfo_exists():
+            self.pron_practice_window.destroy()
+        
+        # Show results dialog
+        result_msg = f"""🎉 KẾT QUẢ LUYỆN PHÁT ÂM
+
+👤 Học sinh: {self.pron_user_name}
+📊 Tổng câu: {total}
+✅ Đúng: {correct}
+❌ Sai: {wrong}
+📈 Độ chính xác: {accuracy:.1f}%
+
+🔗 Kết quả đã được lưu vào Leaderboard"""
+        
+        messagebox.showinfo("✅ Hoàn thành", result_msg)
+        
+        # Save to database
+        try:
+            from datetime import datetime
+            self.study_db.add_result(
+                user_name=self.pron_user_name,
+                sheet_name=Path(self.pron_selected_file).name,
+                quiz_type="pronunciation",
+                score=accuracy,
+                correct_count=correct,
+                wrong_count=wrong,
+                wrong_questions=",".join([r["question"] for r in self.pron_results if not r["is_correct"]])
+            )
+        except Exception as e:
+            print(f"⚠️ Lỗi lưu kết quả: {e}")
 
 def main():
     root = tk.Tk()
