@@ -216,6 +216,10 @@ class VoiceManager:
     def _play_audio_pygame(self, audio_fp, language="en"):
         """Phát audio bằng pygame với volume khác nhau per language"""
         try:
+            # Ensure pygame mixer is initialized
+            if not pygame.mixer.get_init():
+                pygame.mixer.init()
+            
             # Volume mapping: Anh/Trung/Nhật max, Việt giảm xuống
             volume_map = {
                 "en": 1.0,      # English: max

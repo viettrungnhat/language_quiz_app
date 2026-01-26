@@ -12,6 +12,7 @@ from tkinter import ttk, filedialog, messagebox, scrolledtext, simpledialog
 import openpyxl
 import random
 import time
+import sqlite3
 from quiz_engine import QuizEngine
 from voice_quiz_v2 import VoiceQuizManager
 from db_manager import StudyHistoryDB
@@ -28,7 +29,7 @@ class LanguageQuizGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("🎓 Language Quiz v2.2 - Multi-Language Voice -Kiểm tra đa ngôn ngữ 0986183806")
-        self.root.geometry("1100x800")
+        self.root.geometry("1400x1000")
         self.root.resizable(True, True)
         
         # 🎨 Set icon cho app
@@ -44,6 +45,16 @@ class LanguageQuizGUI:
         self.quiz_engine = None
         self.voice_manager = VoiceQuizManager()
         self.study_db = StudyHistoryDB()  # 🎓 Spaced repetition database
+        
+        # 📚 Smart Review Database
+        try:
+            from smart_review_db import SmartReviewDB
+            self.smart_review_db = SmartReviewDB()
+            print("✅ Smart Review System initialized!")
+        except Exception as e:
+            print(f"⚠️ Smart Review DB error: {e}")
+            self.smart_review_db = None
+        
         self.selected_file = None
         self.data = []
         self.current_question_idx = 0
@@ -97,6 +108,29 @@ class LanguageQuizGUI:
         self.files_tab = ttk.Frame(self.notebook)
         self.notebook.add(self.files_tab, text="📚 Quản Lý File")
         self._create_files_manager_tab()
+        
+        # Tab 3: Multiple Choice Practice (luôn hiển thị)
+        self.practice_tab = ttk.Frame(self.notebook)
+        self.notebook.add(self.practice_tab, text="📱 Practice (ABC)")
+        self.practice_quiz_engine = None
+        self.practice_questions = []
+        self.practice_current_idx = 0
+        self.practice_results = []
+        self.practice_paused = False
+        self._create_practice_tab()
+        
+        # Tab 4: Flashcard Mode (luôn hiển thị)
+        self.flashcard_tab = ttk.Frame(self.notebook)
+        self.notebook.add(self.flashcard_tab, text="🃏 Flashcard")
+        self.flashcard_data = []
+        self.flashcard_current_idx = 0
+        self.flashcard_showing_answer = False
+        self._create_flashcard_tab()
+        
+        # Tab 5: Dashboard (luôn hiển thị)
+        self.dashboard_tab = ttk.Frame(self.notebook)
+        self.notebook.add(self.dashboard_tab, text="📈 Dashboard")
+        self._create_dashboard_tab()
         
         # Tab Results (luôn hiển thị)
         self.results_tab = ttk.Frame(self.notebook)
@@ -424,6 +458,31 @@ class LanguageQuizGUI:
         ttk.Radiobutton(ja_voice_frame, text="👩 Nữ (Mizuki)", variable=self.ja_voice_var, value="female").pack(side=tk.LEFT, padx=3)
         ttk.Radiobutton(ja_voice_frame, text="👨 Nam (Takumi)", variable=self.ja_voice_var, value="male").pack(side=tk.LEFT, padx=3)
         
+        # Voice Speed Control
+        speed_frame = ttk.Frame(voice_frame)
+        speed_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(speed_frame, text="🔊 Tốc độ:", font=("Segoe UI", 9), width=10).pack(side=tk.LEFT)
+        self.voice_speed_var = tk.DoubleVar(value=1.0)
+        
+        # Speed slider: 0.5x to 2.0x
+        self.voice_speed_slider = ttk.Scale(
+            speed_frame, from_=0.5, to=2.0, variable=self.voice_speed_var,
+            orient=tk.HORIZONTAL, length=150,
+            command=self._update_speed_label
+        )
+        self.voice_speed_slider.pack(side=tk.LEFT, padx=5)
+        
+        self.voice_speed_label = ttk.Label(speed_frame, text="1.0x", font=("Segoe UI", 9, "bold"), width=5)
+        self.voice_speed_label.pack(side=tk.LEFT)
+        
+        # Preset buttons
+        ttk.Button(speed_frame, text="0.5x", width=4, 
+                  command=lambda: self._set_voice_speed(0.5)).pack(side=tk.LEFT, padx=2)
+        ttk.Button(speed_frame, text="1x", width=4, 
+                  command=lambda: self._set_voice_speed(1.0)).pack(side=tk.LEFT, padx=2)
+        ttk.Button(speed_frame, text="1.5x", width=4, 
+                  command=lambda: self._set_voice_speed(1.5)).pack(side=tk.LEFT, padx=2)
+        
         ttk.Separator(voice_frame, orient='horizontal').pack(fill=tk.X, pady=8)
         
         # Quiz mode
@@ -458,14 +517,31 @@ class LanguageQuizGUI:
         self.shuffle_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(range_frame_container, text="🔀 Trộn câu hỏi", variable=self.shuffle_var).pack(anchor=tk.W, pady=(5,0))
         
-        # Start Buttons
-        button_frame = ttk.LabelFrame(right_col, text="🚀 Bắt đầu", padding=15)
+        # Start Buttons - HORIZONTAL LAYOUT
+        button_frame = ttk.LabelFrame(right_col, text="🚀 Bắt đầu", padding=10)
         button_frame.pack(fill=tk.X)
         
-        ttk.Button(button_frame, text="▶️ KIỂM TRA THƯỜNG", 
-                  command=self.start_quiz, width=25).pack(pady=5)
-        ttk.Button(button_frame, text="🎤 VOICE QUIZ", 
-                  command=self.start_voice_quiz, width=25).pack(pady=5)
+        # Grid 2 columns
+        button_frame.columnconfigure(0, weight=1)
+        button_frame.columnconfigure(1, weight=1)
+        
+        tk.Button(button_frame, text="▶️ KIỂM TRA\nTHƯỜNG", 
+                 command=self.start_quiz, font=("Segoe UI", 11, "bold"),
+                 bg="#2196f3", fg="white", height=3, cursor="hand2"
+                 ).grid(row=0, column=0, sticky="nsew", padx=3, pady=3)
+        
+        tk.Button(button_frame, text="🎤 VOICE\nQUIZ", 
+                 command=self.start_voice_quiz, font=("Segoe UI", 11, "bold"),
+                 bg="#4caf50", fg="white", height=3, cursor="hand2"
+                 ).grid(row=0, column=1, sticky="nsew", padx=3, pady=3)
+        
+        # Pause button (only for Voice Quiz)
+        self.voice_pause_btn = tk.Button(
+            button_frame, text="⏸️ Tạm dừng", 
+            command=self._toggle_voice_pause, font=("Segoe UI", 10),
+            bg="#ff9800", fg="white", state=tk.DISABLED, cursor="hand2"
+        )
+        self.voice_pause_btn.grid(row=1, column=0, columnspan=2, sticky="ew", padx=3, pady=(3,0))
         
         # Info - compact version at bottom
         info_frame = ttk.Frame(right_col)
@@ -536,7 +612,22 @@ class LanguageQuizGUI:
         left_frame = ttk.Frame(main_container)
         left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
         
-        ttk.Label(left_frame, text="❓ Câu hỏi", font=("Arial", 11, "bold"), foreground="#2c3e50").pack(anchor=tk.W, pady=(0,5))
+        # Question header with speaker button
+        question_header = ttk.Frame(left_frame)
+        question_header.pack(fill=tk.X, pady=(0,5))
+        
+        ttk.Label(question_header, text="❓ Câu hỏi", font=("Arial", 11, "bold"), foreground="#2c3e50").pack(side=tk.LEFT)
+        
+        # 🔊 Speaker button to repeat question
+        self.speak_question_btn = tk.Button(
+            question_header, text="🔊", font=("Arial", 16),
+            bg="#3498db", fg="white", activebackground="#2980b9",
+            relief=tk.RAISED, borderwidth=2, cursor="hand2",
+            command=self._speak_current_question,
+            state=tk.DISABLED
+        )
+        self.speak_question_btn.pack(side=tk.RIGHT, padx=5)
+        
         self.voice_question_text = scrolledtext.ScrolledText(left_frame, height=10, width=40, 
                                                              font=("Arial", 12, "bold"), wrap=tk.WORD,
                                                              bg="#f9f9f9", relief=tk.FLAT)
@@ -588,11 +679,32 @@ class LanguageQuizGUI:
         self.voice_feedback_text.pack(fill=tk.BOTH, expand=True)
         self.voice_feedback_text.config(state=tk.DISABLED)
         
-        # Buttons at bottom
+        # Buttons at bottom - with pause button and increased height
         button_frame = ttk.Frame(self.voice_quiz_tab)
         button_frame.pack(fill=tk.X, padx=10, pady=10)
-        ttk.Button(button_frame, text="⏭️ CÂU TIẾP", command=self.voice_next_question, width=20).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="❌ DỪNG", command=self.voice_stop_quiz, width=20).pack(side=tk.LEFT, padx=5)
+        
+        # Create buttons with custom style for better visibility
+        style = ttk.Style()
+        style.configure('Voice.TButton', font=('Segoe UI', 11))
+        
+        self.voice_quiz_pause_btn = ttk.Button(
+            button_frame, text="⏸️ TẠM DỪNG", 
+            command=self._toggle_voice_quiz_pause, 
+            width=20, style='Voice.TButton'
+        )
+        self.voice_quiz_pause_btn.pack(side=tk.LEFT, padx=5, ipady=8)
+        
+        ttk.Button(
+            button_frame, text="⏭️ CÂU TIẾP", 
+            command=self.voice_next_question, 
+            width=20, style='Voice.TButton'
+        ).pack(side=tk.LEFT, padx=5, ipady=8)
+        
+        ttk.Button(
+            button_frame, text="❌ DỪNG", 
+            command=self.voice_stop_quiz, 
+            width=20, style='Voice.TButton'
+        ).pack(side=tk.LEFT, padx=5, ipady=8)
     
     def _create_files_manager_tab(self):
         """Tab Quản Lý File - Manage multiple Excel files"""
@@ -819,17 +931,931 @@ class LanguageQuizGUI:
                 foreground="gray"
             )
     
+    def _create_dashboard_tab(self):
+        """📈 Tab Dashboard - Thống kê và biểu đồ tiến độ học tập"""
+        main_frame = ttk.Frame(self.dashboard_tab, padding=15)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Title
+        ttk.Label(main_frame, text="📈 Learning Dashboard", 
+                 font=("Segoe UI", 16, "bold")).pack(pady=(0, 10))
+        
+        # Top Row: Stats Cards
+        stats_frame = ttk.Frame(main_frame)
+        stats_frame.pack(fill=tk.X, pady=10)
+        
+        # Card 1: Total Words
+        card1 = tk.Frame(stats_frame, bg="#e3f2fd", relief=tk.RAISED, borderwidth=2)
+        card1.pack(side=tk.LEFT, expand=True, fill=tk.BOTH, padx=5)
+        tk.Label(card1, text="📚", font=("Arial", 24), bg="#e3f2fd").pack(pady=(10,5))
+        self.dashboard_total_label = tk.Label(card1, text="0", font=("Segoe UI", 28, "bold"), 
+                                               bg="#e3f2fd", fg="#1565c0")
+        self.dashboard_total_label.pack()
+        tk.Label(card1, text="Tổng số từ", font=("Segoe UI", 10), bg="#e3f2fd").pack(pady=(0,10))
+        
+        # Card 2: Mastered
+        card2 = tk.Frame(stats_frame, bg="#c8e6c9", relief=tk.RAISED, borderwidth=2)
+        card2.pack(side=tk.LEFT, expand=True, fill=tk.BOTH, padx=5)
+        tk.Label(card2, text="✅", font=("Arial", 24), bg="#c8e6c9").pack(pady=(10,5))
+        self.dashboard_mastered_label = tk.Label(card2, text="0", font=("Segoe UI", 28, "bold"), 
+                                                  bg="#c8e6c9", fg="#2e7d32")
+        self.dashboard_mastered_label.pack()
+        tk.Label(card2, text="Đã thành thạo", font=("Segoe UI", 10), bg="#c8e6c9").pack(pady=(0,10))
+        
+        # Card 3: In Progress
+        card3 = tk.Frame(stats_frame, bg="#fff9c4", relief=tk.RAISED, borderwidth=2)
+        card3.pack(side=tk.LEFT, expand=True, fill=tk.BOTH, padx=5)
+        tk.Label(card3, text="📝", font=("Arial", 24), bg="#fff9c4").pack(pady=(10,5))
+        self.dashboard_progress_label = tk.Label(card3, text="0", font=("Segoe UI", 28, "bold"), 
+                                                  bg="#fff9c4", fg="#f57f17")
+        self.dashboard_progress_label.pack()
+        tk.Label(card3, text="Đang học", font=("Segoe UI", 10), bg="#fff9c4").pack(pady=(0,10))
+        
+        # Card 4: Weak
+        card4 = tk.Frame(stats_frame, bg="#ffcdd2", relief=tk.RAISED, borderwidth=2)
+        card4.pack(side=tk.LEFT, expand=True, fill=tk.BOTH, padx=5)
+        tk.Label(card4, text="⚠️", font=("Arial", 24), bg="#ffcdd2").pack(pady=(10,5))
+        self.dashboard_weak_label = tk.Label(card4, text="0", font=("Segoe UI", 28, "bold"), 
+                                              bg="#ffcdd2", fg="#c62828")
+        self.dashboard_weak_label.pack()
+        tk.Label(card4, text="Cần ôn tập", font=("Segoe UI", 10), bg="#ffcdd2").pack(pady=(0,10))
+        
+        # Charts Container
+        charts_frame = ttk.Frame(main_frame)
+        charts_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+        
+        # Left: Pie Chart Frame
+        pie_frame = ttk.LabelFrame(charts_frame, text="📊 Phân bố mức độ thành thạo", padding=10)
+        pie_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0,5))
+        
+        self.pie_chart_canvas = tk.Canvas(pie_frame, bg="white", width=350, height=300)
+        self.pie_chart_canvas.pack(fill=tk.BOTH, expand=True)
+        
+        # Right: Bar Chart Frame
+        bar_frame = ttk.LabelFrame(charts_frame, text="📈 Tiến độ theo ngày", padding=10)
+        bar_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5,0))
+        
+        self.bar_chart_canvas = tk.Canvas(bar_frame, bg="white", width=350, height=300)
+        self.bar_chart_canvas.pack(fill=tk.BOTH, expand=True)
+        
+        # Control buttons
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.pack(fill=tk.X, pady=10)
+        
+        ttk.Button(btn_frame, text="🔄 Cập nhật", 
+                  command=self._refresh_dashboard, width=15).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="📊 Export Stats", 
+                  command=self.export_smart_review_stats, width=15).pack(side=tk.LEFT, padx=5)
+        
+        # Initial draw
+        self._draw_empty_charts()
+    
+    def _draw_empty_charts(self):
+        """Vẽ biểu đồ trống ban đầu"""
+        # Empty pie chart
+        self.pie_chart_canvas.delete("all")
+        self.pie_chart_canvas.create_text(175, 150, text="Chưa có dữ liệu\n\nHãy làm quiz trước!", 
+                                          font=("Segoe UI", 12), fill="#888888", justify=tk.CENTER)
+        
+        # Empty bar chart
+        self.bar_chart_canvas.delete("all")
+        self.bar_chart_canvas.create_text(175, 150, text="Chưa có dữ liệu\n\nHãy làm quiz trước!", 
+                                          font=("Segoe UI", 12), fill="#888888", justify=tk.CENTER)
+    
+    def _refresh_dashboard(self):
+        """Cập nhật Dashboard với dữ liệu mới nhất"""
+        if not self.smart_review_db:
+            messagebox.showwarning("Cảnh báo", "⚠️ Smart Review chưa khởi tạo!")
+            return
+        
+        try:
+            user_name = "Default"
+            file_path = str(self.selected_file) if hasattr(self, 'selected_file') and self.selected_file else ""
+            
+            # Get stats
+            stats = self.smart_review_db.get_mastery_stats(file_path, user_name)
+            
+            # Update cards
+            total = stats.get('total', 0)
+            mastered = stats.get('mastered', 0)
+            good = stats.get('good', 0) - mastered  # Good but not mastered
+            weak = stats.get('weak', 0)
+            
+            self.dashboard_total_label.config(text=str(total))
+            self.dashboard_mastered_label.config(text=str(mastered))
+            self.dashboard_progress_label.config(text=str(good))
+            self.dashboard_weak_label.config(text=str(weak))
+            
+            # Draw Pie Chart
+            self._draw_pie_chart(mastered, good, weak)
+            
+            # Draw Bar Chart (progress over time)
+            self._draw_bar_chart()
+            
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"❌ Không thể tải dữ liệu: {str(e)}")
+    
+    def _draw_pie_chart(self, mastered, good, weak):
+        """Vẽ biểu đồ tròn phân bố mức độ"""
+        self.pie_chart_canvas.delete("all")
+        
+        total = mastered + good + weak
+        if total == 0:
+            self.pie_chart_canvas.create_text(175, 150, text="Không có dữ liệu", 
+                                              font=("Segoe UI", 12), fill="#888888")
+            return
+        
+        # Pie chart parameters
+        cx, cy = 175, 130
+        radius = 100
+        
+        # Data
+        data = [
+            (mastered, "#4caf50", "Thành thạo"),
+            (good, "#ffc107", "Đang học"),
+            (weak, "#f44336", "Cần ôn")
+        ]
+        
+        start_angle = 0
+        for value, color, label in data:
+            if value == 0:
+                continue
+            extent = (value / total) * 360
+            
+            # Draw slice
+            self.pie_chart_canvas.create_arc(
+                cx - radius, cy - radius, cx + radius, cy + radius,
+                start=start_angle, extent=extent, fill=color, outline="white", width=2
+            )
+            
+            # Draw label
+            import math
+            mid_angle = math.radians(start_angle + extent / 2)
+            label_x = cx + (radius + 30) * math.cos(mid_angle)
+            label_y = cy - (radius + 30) * math.sin(mid_angle)
+            percent = int(value * 100 / total)
+            self.pie_chart_canvas.create_text(label_x, label_y, 
+                                              text=f"{label}\n{percent}%", 
+                                              font=("Segoe UI", 9, "bold"), fill=color)
+            
+            start_angle += extent
+        
+        # Legend
+        legend_y = 260
+        for i, (value, color, label) in enumerate(data):
+            x = 60 + i * 120
+            self.pie_chart_canvas.create_rectangle(x-10, legend_y-5, x+10, legend_y+5, fill=color, outline="")
+            self.pie_chart_canvas.create_text(x+40, legend_y, text=f"{label}: {value}", 
+                                              font=("Segoe UI", 9), anchor=tk.W)
+    
+    def _draw_bar_chart(self):
+        """Vẽ biểu đồ cột tiến độ theo ngày"""
+        self.bar_chart_canvas.delete("all")
+        
+        # Get study sessions from database
+        try:
+            if not self.smart_review_db:
+                raise Exception("No database")
+            
+            # Get last 7 days data
+            import sqlite3
+            from datetime import datetime, timedelta
+            
+            conn = sqlite3.connect(self.smart_review_db.db_path)
+            cursor = conn.cursor()
+            
+            # Get daily stats for last 7 days
+            days_data = []
+            for i in range(6, -1, -1):
+                date = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
+                cursor.execute("""
+                    SELECT COUNT(*) FROM question_history 
+                    WHERE DATE(last_attempt_date) = ?
+                """, (date,))
+                count = cursor.fetchone()[0]
+                days_data.append((date[-5:], count))  # MM-DD format
+            
+            conn.close()
+            
+            if not any(d[1] for d in days_data):
+                self.bar_chart_canvas.create_text(175, 150, text="Chưa có hoạt động\n\nHãy làm quiz!", 
+                                                  font=("Segoe UI", 12), fill="#888888", justify=tk.CENTER)
+                return
+            
+            # Draw bars
+            max_val = max(d[1] for d in days_data) or 1
+            bar_width = 35
+            gap = 10
+            start_x = 30
+            chart_height = 200
+            bottom_y = 250
+            
+            for i, (label, value) in enumerate(days_data):
+                x = start_x + i * (bar_width + gap)
+                bar_height = (value / max_val) * chart_height if max_val > 0 else 0
+                
+                # Bar
+                color = "#2196f3" if i < 6 else "#4caf50"  # Today is green
+                self.bar_chart_canvas.create_rectangle(
+                    x, bottom_y - bar_height, x + bar_width, bottom_y,
+                    fill=color, outline=""
+                )
+                
+                # Value on top
+                if value > 0:
+                    self.bar_chart_canvas.create_text(
+                        x + bar_width/2, bottom_y - bar_height - 10,
+                        text=str(value), font=("Segoe UI", 9, "bold"), fill=color
+                    )
+                
+                # Date label
+                self.bar_chart_canvas.create_text(
+                    x + bar_width/2, bottom_y + 15,
+                    text=label, font=("Segoe UI", 8), fill="#666666"
+                )
+            
+            # Y axis
+            self.bar_chart_canvas.create_line(25, 30, 25, bottom_y, fill="#cccccc", width=1)
+            
+        except Exception as e:
+            self.bar_chart_canvas.create_text(175, 150, text=f"Lỗi: {str(e)}", 
+                                              font=("Segoe UI", 10), fill="#f44336")
+    
     def _create_results_tab(self):
-        """Tab Results"""
+        """Tab Results với Top Scores"""
+        # Top frame: Buttons
         button_frame = ttk.Frame(self.results_tab)
         button_frame.pack(fill=tk.X, padx=10, pady=10)
         ttk.Button(button_frame, text="💾 Lưu kết quả", command=self.save_results).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="� Xem kết quả cũ", command=self.load_previous_results).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="�🔄 Kiểm tra lại", command=self.restart_quiz).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="📂 Xem kết quả cũ", command=self.load_previous_results).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="🔄 Kiểm tra lại", command=self.restart_quiz).pack(side=tk.LEFT, padx=5)
         
-        self.results_text = scrolledtext.ScrolledText(self.results_tab, font=("Arial", 10), wrap=tk.WORD)
-        self.results_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        # 📊 Smart Review Stats button
+        ttk.Separator(button_frame, orient='vertical').pack(side=tk.LEFT, fill=tk.Y, padx=10)
+        ttk.Button(button_frame, text="📊 Smart Review Stats", 
+                  command=self.export_smart_review_stats,
+                  style="Accent.TButton").pack(side=tk.LEFT, padx=5)
+        
+        # Container split: Results + Leaderboard
+        content_frame = ttk.Frame(self.results_tab)
+        content_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0,10))
+        
+        # Left: Results text
+        results_frame = ttk.LabelFrame(content_frame, text="📋 Kết quả chi tiết", padding=5)
+        results_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0,5))
+        
+        self.results_text = scrolledtext.ScrolledText(results_frame, font=("Arial", 10), wrap=tk.WORD)
+        self.results_text.pack(fill=tk.BOTH, expand=True)
         self.results_text.config(state=tk.DISABLED)
+        
+        # Right: Leaderboard
+        leaderboard_frame = ttk.LabelFrame(content_frame, text="🏆 Top Điểm Cao", padding=10)
+        leaderboard_frame.pack(side=tk.RIGHT, fill=tk.BOTH, padx=(5,0), ipadx=10)
+        
+        # Leaderboard listbox
+        self.leaderboard_list = tk.Listbox(
+            leaderboard_frame, font=("Courier New", 10), 
+            bg="#fffef0", width=35, height=20
+        )
+        self.leaderboard_list.pack(fill=tk.BOTH, expand=True)
+        
+        # Load leaderboard
+        self._load_leaderboard()
+    
+    def _create_practice_tab(self):
+        """Tab Multiple Choice Practice - luyện tập không cần micro"""
+        # Container chính
+        main_frame = ttk.Frame(self.practice_tab, padding=20)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Title - nhỏ gọn
+        title_label = ttk.Label(main_frame, text="📱 Multiple Choice Practice", 
+                               font=("Segoe UI", 14, "bold"))
+        title_label.pack(pady=(0, 5))
+        
+        # Settings Frame - COMPACT
+        settings_frame = ttk.LabelFrame(main_frame, text="⚙️ Cài đặt", padding=5)
+        settings_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        # Row 1: File, Type, Range - ALL IN ONE ROW
+        compact_row = ttk.Frame(settings_frame)
+        compact_row.pack(fill=tk.X, pady=3)
+        
+        ttk.Label(compact_row, text="File:", font=("Segoe UI", 9, "bold")).pack(side=tk.LEFT)
+        self.practice_file_label = ttk.Label(compact_row, text="Chưa chọn", 
+                                             foreground="#2196f3", font=("Segoe UI", 9))
+        self.practice_file_label.pack(side=tk.LEFT, padx=(3,10))
+        ttk.Button(compact_row, text="📂 Chọn File", command=self._practice_select_file, 
+                  width=10).pack(side=tk.RIGHT, padx=2)
+        ttk.Button(compact_row, text="▶️ Bắt Đầu Practice", command=self._start_practice_quiz, 
+                  style="Accent.TButton", width=18).pack(side=tk.RIGHT, padx=2)
+        
+        # Row 2: Quiz Type + Range + Pause
+        type_range_row = ttk.Frame(settings_frame)
+        type_range_row.pack(fill=tk.X, pady=3)
+        
+        ttk.Label(type_range_row, text="Loại:", font=("Segoe UI", 9, "bold")).pack(side=tk.LEFT)
+        self.practice_quiz_type_var = tk.StringVar(value="meaning")
+        ttk.Radiobutton(type_range_row, text="💬 Nghĩa từ", variable=self.practice_quiz_type_var, 
+                       value="meaning").pack(side=tk.LEFT, padx=3)
+        ttk.Radiobutton(type_range_row, text="📝 Dịch câu", variable=self.practice_quiz_type_var, 
+                       value="example").pack(side=tk.LEFT, padx=3)
+        
+        ttk.Label(type_range_row, text="   Câu:", font=("Segoe UI", 9, "bold")).pack(side=tk.LEFT)
+        self.practice_start_var = tk.IntVar(value=1)
+        ttk.Spinbox(type_range_row, from_=1, to=1000, textvariable=self.practice_start_var, 
+                   width=5).pack(side=tk.LEFT, padx=2)
+        ttk.Label(type_range_row, text="-", font=("Segoe UI", 9)).pack(side=tk.LEFT)
+        self.practice_end_var = tk.IntVar(value=10)
+        ttk.Spinbox(type_range_row, from_=1, to=1000, textvariable=self.practice_end_var, 
+                   width=5).pack(side=tk.LEFT, padx=2)
+        
+        # Pause button
+        self.practice_pause_btn = tk.Button(
+            type_range_row, text="⏸️ Tạm dừng", font=("Segoe UI", 9),
+            bg="#ff9800", fg="white", command=self._toggle_practice_pause,
+            state=tk.DISABLED, cursor="hand2", width=12
+        )
+        self.practice_pause_btn.pack(side=tk.RIGHT, padx=5)
+        
+        # Progress Frame - compact
+        progress_frame = ttk.Frame(main_frame)
+        progress_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        # Progress label and timer on same row
+        progress_row = ttk.Frame(progress_frame)
+        progress_row.pack(fill=tk.X)
+        
+        self.practice_progress_label = ttk.Label(progress_row, text="Chưa bắt đầu", 
+                                                 font=("Segoe UI", 10))
+        self.practice_progress_label.pack(side=tk.LEFT)
+        
+        # Timer label (countdown)
+        self.practice_timer_label = ttk.Label(progress_row, text="", 
+                                              font=("Segoe UI", 10, "bold"),
+                                              foreground="#ff5722")
+        self.practice_timer_label.pack(side=tk.RIGHT)
+        
+        self.practice_progress_bar = ttk.Progressbar(progress_frame, mode='determinate', 
+                                                     length=600)
+        self.practice_progress_bar.pack(fill=tk.X, pady=5)
+        
+        # Question Frame - COMPACT KHÔNG CUỘN
+        question_frame = ttk.LabelFrame(main_frame, text="❓ Câu hỏi", padding=8)
+        question_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        # Header row with speaker button
+        question_header = ttk.Frame(question_frame)
+        question_header.pack(fill=tk.X, pady=(0,5))
+        
+        self.practice_speak_btn = tk.Button(
+            question_header, text="🔊", font=("Arial", 14),
+            bg="#3498db", fg="white",
+            command=self._speak_practice_question,
+            state=tk.DISABLED, cursor="hand2"
+        )
+        self.practice_speak_btn.pack(side=tk.LEFT, padx=3)
+        
+        # Question text - Dùng Label thay vì ScrolledText
+        self.practice_question_label = tk.Label(
+            question_frame, 
+            text="",
+            font=("Segoe UI", 14, "bold"),
+            bg="#f0f8ff", fg="#1565c0",
+            wraplength=1300, justify=tk.LEFT,
+            padx=10, pady=10, anchor=tk.W
+        )
+        self.practice_question_label.pack(fill=tk.X)
+        
+        # Answer Buttons Frame (4 buttons in 2x2 grid)
+        answers_frame = ttk.LabelFrame(main_frame, text="🎯 Chọn đáp án", padding=10)
+        answers_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 5))
+        
+        # Grid configuration
+        answers_frame.columnconfigure(0, weight=1)
+        answers_frame.columnconfigure(1, weight=1)
+        answers_frame.rowconfigure(0, weight=1)
+        answers_frame.rowconfigure(1, weight=1)
+        
+        # A and B buttons (first row)
+        self.practice_btn_a = tk.Button(
+            answers_frame, text="A", font=("Segoe UI", 11),
+            bg="#bbdefb", fg="#000000", activebackground="#64b5f6", activeforeground="#000000",
+            relief=tk.RAISED, borderwidth=2,
+            command=lambda: self._practice_submit_answer("A"), state=tk.DISABLED,
+            cursor="hand2", wraplength=650, justify=tk.LEFT, padx=8, pady=5
+        )
+        self.practice_btn_a.grid(row=0, column=0, sticky="nsew", padx=3, pady=3)
+        
+        self.practice_btn_b = tk.Button(
+            answers_frame, text="B", font=("Segoe UI", 11),
+            bg="#c8e6c9", fg="#000000", activebackground="#81c784", activeforeground="#000000",
+            relief=tk.RAISED, borderwidth=2,
+            command=lambda: self._practice_submit_answer("B"), state=tk.DISABLED,
+            cursor="hand2", wraplength=650, justify=tk.LEFT, padx=8, pady=5
+        )
+        self.practice_btn_b.grid(row=0, column=1, sticky="nsew", padx=3, pady=3)
+        
+        # C and D buttons (second row)
+        self.practice_btn_c = tk.Button(
+            answers_frame, text="C", font=("Segoe UI", 11),
+            bg="#ffe0b2", fg="#000000", activebackground="#ffb74d", activeforeground="#000000",
+            relief=tk.RAISED, borderwidth=2,
+            command=lambda: self._practice_submit_answer("C"), state=tk.DISABLED,
+            cursor="hand2", wraplength=650, justify=tk.LEFT, padx=8, pady=5
+        )
+        self.practice_btn_c.grid(row=1, column=0, sticky="nsew", padx=3, pady=3)
+        
+        self.practice_btn_d = tk.Button(
+            answers_frame, text="D", font=("Segoe UI", 11),
+            bg="#f8bbd0", fg="#000000", activebackground="#f06292", activeforeground="#000000",
+            relief=tk.RAISED, borderwidth=2,
+            command=lambda: self._practice_submit_answer("D"), state=tk.DISABLED,
+            cursor="hand2", wraplength=650, justify=tk.LEFT, padx=8, pady=5
+        )
+        self.practice_btn_d.grid(row=1, column=1, sticky="nsew", padx=3, pady=3)
+        
+        # Feedback Frame
+        feedback_frame = ttk.LabelFrame(main_frame, text="💬 Phản hồi", padding=5)
+        feedback_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        self.practice_feedback_text = scrolledtext.ScrolledText(
+            feedback_frame, 
+            wrap=tk.WORD, 
+            height=2,
+            font=("Segoe UI", 10),
+            bg="#fffef0",
+            state=tk.DISABLED
+        )
+        self.practice_feedback_text.pack(fill=tk.BOTH, expand=True)
+        
+        # ⌨️ Keyboard shortcuts hint
+        keyboard_hint = ttk.Label(main_frame, 
+                                  text="⌨️ Phím tắt: A, B, C, D", 
+                                  font=("Segoe UI", 9, "italic"),
+                                  foreground="gray")
+        keyboard_hint.pack(pady=(5, 0))
+        
+        # Bind keyboard events for A/B/C/D
+        self.practice_tab.bind("<KeyPress-a>", lambda e: self._practice_submit_answer("A") if self.practice_btn_a['state'] == tk.NORMAL else None)
+        self.practice_tab.bind("<KeyPress-A>", lambda e: self._practice_submit_answer("A") if self.practice_btn_a['state'] == tk.NORMAL else None)
+        self.practice_tab.bind("<KeyPress-b>", lambda e: self._practice_submit_answer("B") if self.practice_btn_b['state'] == tk.NORMAL else None)
+        self.practice_tab.bind("<KeyPress-B>", lambda e: self._practice_submit_answer("B") if self.practice_btn_b['state'] == tk.NORMAL else None)
+        self.practice_tab.bind("<KeyPress-c>", lambda e: self._practice_submit_answer("C") if self.practice_btn_c['state'] == tk.NORMAL else None)
+        self.practice_tab.bind("<KeyPress-C>", lambda e: self._practice_submit_answer("C") if self.practice_btn_c['state'] == tk.NORMAL else None)
+        self.practice_tab.bind("<KeyPress-d>", lambda e: self._practice_submit_answer("D") if self.practice_btn_d['state'] == tk.NORMAL else None)
+        self.practice_tab.bind("<KeyPress-D>", lambda e: self._practice_submit_answer("D") if self.practice_btn_d['state'] == tk.NORMAL else None)
+        
+        # Focus tab when clicked to enable keyboard shortcuts
+        self.practice_tab.focus_set()
+        
+        # 📂 Load practice file from settings
+        if "practice_file" in self.user_settings and self.user_settings["practice_file"]:
+            practice_file = self.user_settings["practice_file"]
+            if Path(practice_file).exists():
+                self.practice_selected_file = practice_file
+                self.practice_file_label.config(
+                    text=Path(practice_file).name,
+                    foreground="green"
+                )
+        
+        # 📂 Load flashcard file from settings
+        if "flashcard_file" in self.user_settings and self.user_settings["flashcard_file"]:
+            flashcard_file = self.user_settings["flashcard_file"]
+            if Path(flashcard_file).exists():
+                self.flashcard_file = flashcard_file
+    
+    def _create_flashcard_tab(self):
+        """🃏 Tab Flashcard Mode - Học từ với thẻ lật"""
+        main_frame = ttk.Frame(self.flashcard_tab, padding=15)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Title
+        ttk.Label(main_frame, text="🃏 Flashcard Mode", 
+                 font=("Segoe UI", 14, "bold")).pack(pady=(0, 10))
+        
+        # Settings Row
+        settings_frame = ttk.LabelFrame(main_frame, text="⚙️ Cài đặt", padding=5)
+        settings_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        settings_row = ttk.Frame(settings_frame)
+        settings_row.pack(fill=tk.X)
+        
+        ttk.Label(settings_row, text="File:", font=("Segoe UI", 9, "bold")).pack(side=tk.LEFT)
+        
+        # Hiển thị tên file đã lưu nếu có
+        saved_file = self.user_settings.get("flashcard_file", "")
+        if saved_file and Path(saved_file).exists():
+            display_name = Path(saved_file).name
+            display_color = "green"
+        else:
+            display_name = "Chưa chọn"
+            display_color = "#2196f3"
+        
+        self.flashcard_file_label = ttk.Label(settings_row, text=display_name, 
+                                               foreground=display_color, font=("Segoe UI", 9))
+        self.flashcard_file_label.pack(side=tk.LEFT, padx=(3, 10))
+        ttk.Button(settings_row, text="📂 Chọn File", 
+                  command=self._flashcard_select_file, width=10).pack(side=tk.LEFT, padx=3)
+        
+        ttk.Label(settings_row, text="   Câu:", font=("Segoe UI", 9, "bold")).pack(side=tk.LEFT)
+        self.flashcard_start_var = tk.IntVar(value=1)
+        ttk.Spinbox(settings_row, from_=1, to=1000, textvariable=self.flashcard_start_var, 
+                   width=5).pack(side=tk.LEFT, padx=2)
+        ttk.Label(settings_row, text="-").pack(side=tk.LEFT)
+        self.flashcard_end_var = tk.IntVar(value=20)
+        ttk.Spinbox(settings_row, from_=1, to=1000, textvariable=self.flashcard_end_var, 
+                   width=5).pack(side=tk.LEFT, padx=2)
+        
+        ttk.Button(settings_row, text="▶️ Bắt Đầu", 
+                  command=self._start_flashcard, width=12).pack(side=tk.RIGHT, padx=3)
+        
+        # Progress Row
+        progress_frame = ttk.Frame(main_frame)
+        progress_frame.pack(fill=tk.X, pady=5)
+        
+        self.flashcard_progress_label = ttk.Label(progress_frame, text="Chưa bắt đầu", 
+                                                   font=("Segoe UI", 10))
+        self.flashcard_progress_label.pack(side=tk.LEFT)
+        
+        self.flashcard_stats_label = ttk.Label(progress_frame, text="", 
+                                                font=("Segoe UI", 10, "bold"),
+                                                foreground="#4caf50")
+        self.flashcard_stats_label.pack(side=tk.RIGHT)
+        
+        self.flashcard_progress_bar = ttk.Progressbar(progress_frame, mode='determinate', length=600)
+        self.flashcard_progress_bar.pack(fill=tk.X, pady=3)
+        
+        # ============ FLASHCARD DISPLAY ============
+        card_frame = ttk.Frame(main_frame)
+        card_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+        
+        # The Card (clickable to flip)
+        self.flashcard_canvas = tk.Canvas(card_frame, bg="#ffffff", highlightthickness=2,
+                                          highlightbackground="#3498db", cursor="hand2")
+        self.flashcard_canvas.pack(fill=tk.BOTH, expand=True, padx=20)
+        
+        # Card content - Front (Word)
+        self.flashcard_front_frame = tk.Frame(self.flashcard_canvas, bg="#e3f2fd")
+        self.flashcard_front_label = tk.Label(
+            self.flashcard_front_frame, text="Click để bắt đầu",
+            font=("Segoe UI", 28, "bold"), bg="#e3f2fd", fg="#1565c0",
+            wraplength=600, justify=tk.CENTER
+        )
+        self.flashcard_front_label.pack(expand=True, fill=tk.BOTH, padx=30, pady=30)
+        
+        # Speaker button for front
+        self.flashcard_speak_btn = tk.Button(
+            self.flashcard_front_frame, text="🔊", font=("Arial", 20),
+            bg="#3498db", fg="white", command=self._speak_flashcard_word,
+            cursor="hand2"
+        )
+        self.flashcard_speak_btn.pack(pady=10)
+        
+        # Card content - Back (Meaning + Example)
+        self.flashcard_back_frame = tk.Frame(self.flashcard_canvas, bg="#e8f5e9")
+        self.flashcard_meaning_label = tk.Label(
+            self.flashcard_back_frame, text="",
+            font=("Segoe UI", 18, "bold"), bg="#e8f5e9", fg="#2e7d32",
+            wraplength=600, justify=tk.CENTER
+        )
+        self.flashcard_meaning_label.pack(expand=True, pady=10)
+        
+        self.flashcard_example_label = tk.Label(
+            self.flashcard_back_frame, text="",
+            font=("Segoe UI", 14), bg="#e8f5e9", fg="#555555",
+            wraplength=600, justify=tk.CENTER
+        )
+        self.flashcard_example_label.pack(expand=True, pady=10)
+        
+        # Show front initially
+        self.flashcard_front_frame.place(relx=0, rely=0, relwidth=1, relheight=1)
+        
+        # Bind click to flip
+        self.flashcard_canvas.bind("<Button-1>", self._flip_flashcard)
+        self.flashcard_front_frame.bind("<Button-1>", self._flip_flashcard)
+        self.flashcard_front_label.bind("<Button-1>", self._flip_flashcard)
+        
+        # ============ CONTROL BUTTONS ============
+        control_frame = ttk.Frame(main_frame)
+        control_frame.pack(fill=tk.X, pady=10)
+        
+        # Navigation buttons
+        nav_frame = ttk.Frame(control_frame)
+        nav_frame.pack(side=tk.LEFT, padx=10)
+        
+        self.flashcard_prev_btn = tk.Button(
+            nav_frame, text="⬅️ Trước", font=("Segoe UI", 12, "bold"),
+            bg="#90a4ae", fg="white", command=self._flashcard_prev,
+            state=tk.DISABLED, width=10, cursor="hand2"
+        )
+        self.flashcard_prev_btn.pack(side=tk.LEFT, padx=5)
+        
+        self.flashcard_flip_btn = tk.Button(
+            nav_frame, text="🔄 Lật thẻ", font=("Segoe UI", 12, "bold"),
+            bg="#9c27b0", fg="white", command=lambda: self._flip_flashcard(None),
+            state=tk.DISABLED, width=10, cursor="hand2"
+        )
+        self.flashcard_flip_btn.pack(side=tk.LEFT, padx=5)
+        
+        self.flashcard_next_btn = tk.Button(
+            nav_frame, text="Tiếp ➡️", font=("Segoe UI", 12, "bold"),
+            bg="#90a4ae", fg="white", command=self._flashcard_next,
+            state=tk.DISABLED, width=10, cursor="hand2"
+        )
+        self.flashcard_next_btn.pack(side=tk.LEFT, padx=5)
+        
+        # Known/Unknown buttons
+        rating_frame = ttk.Frame(control_frame)
+        rating_frame.pack(side=tk.RIGHT, padx=10)
+        
+        self.flashcard_unknown_btn = tk.Button(
+            rating_frame, text="❌ Chưa thuộc", font=("Segoe UI", 12, "bold"),
+            bg="#f44336", fg="white", command=lambda: self._rate_flashcard(False),
+            state=tk.DISABLED, width=12, cursor="hand2"
+        )
+        self.flashcard_unknown_btn.pack(side=tk.LEFT, padx=5)
+        
+        self.flashcard_known_btn = tk.Button(
+            rating_frame, text="✅ Đã thuộc", font=("Segoe UI", 12, "bold"),
+            bg="#4caf50", fg="white", command=lambda: self._rate_flashcard(True),
+            state=tk.DISABLED, width=12, cursor="hand2"
+        )
+        self.flashcard_known_btn.pack(side=tk.LEFT, padx=5)
+        
+        # Keyboard shortcuts info
+        shortcut_label = ttk.Label(main_frame, 
+            text="⌨️ Phím tắt: Space=Lật | ←/→=Trước/Sau | K=Thuộc | U=Chưa thuộc",
+            font=("Segoe UI", 9), foreground="#888888")
+        shortcut_label.pack(pady=5)
+        
+        # Bind keyboard shortcuts
+        self.root.bind("<space>", lambda e: self._flip_flashcard(None) if self.notebook.index(self.notebook.select()) == 3 else None)
+        self.root.bind("<Left>", lambda e: self._flashcard_prev() if self.notebook.index(self.notebook.select()) == 3 else None)
+        self.root.bind("<Right>", lambda e: self._flashcard_next() if self.notebook.index(self.notebook.select()) == 3 else None)
+        self.root.bind("<k>", lambda e: self._rate_flashcard(True) if self.notebook.index(self.notebook.select()) == 3 else None)
+        self.root.bind("<u>", lambda e: self._rate_flashcard(False) if self.notebook.index(self.notebook.select()) == 3 else None)
+    
+    def _flashcard_select_file(self):
+        """Chọn file Excel cho Flashcard"""
+        from tkinter import filedialog
+        file_path = filedialog.askopenfilename(
+            title="Chọn file Excel",
+            filetypes=[("Excel files", "*.xlsx *.xls")],
+            initialdir=str(Path(__file__).parent / "data")
+        )
+        if file_path:
+            self.flashcard_file = file_path
+            self.flashcard_file_label.config(text=Path(file_path).name, foreground="green")
+            # Lưu vào settings
+            self.user_settings["flashcard_file"] = file_path
+            self._save_settings()
+    
+    def _start_flashcard(self):
+        """Bắt đầu Flashcard session"""
+        if not hasattr(self, 'flashcard_file') or not self.flashcard_file:
+            messagebox.showwarning("Cảnh báo", "⚠️ Vui lòng chọn file Excel trước!")
+            return
+        
+        try:
+            # Load data from Excel
+            from openpyxl import load_workbook
+            wb = load_workbook(self.flashcard_file, data_only=True)
+            ws = wb.active
+            
+            # Đọc header để xác định cấu trúc cột
+            header_row = [str(cell.value).lower() if cell.value else "" for cell in ws[1]]
+            
+            # Tìm cột word (có thể là cột B nếu cột A là số thứ tự)
+            word_col = 0
+            meaning_col = 1
+            example_en_col = 2
+            example_vi_col = 3
+            
+            # Check if first column is number (STT)
+            for i, h in enumerate(header_row):
+                if any(kw in h for kw in ['word', 'từ', '単語', '词', 'vocabulary']):
+                    word_col = i
+                    meaning_col = i + 1
+                    example_en_col = i + 2
+                    example_vi_col = i + 3
+                    break
+            
+            # Nếu cột A là số hoặc "stt", bắt đầu từ cột B
+            if header_row[0] in ['stt', 'no', 'no.', 'số', '#', ''] or header_row[0].isdigit():
+                word_col = 1
+                meaning_col = 2
+                example_en_col = 3
+                example_vi_col = 4
+            
+            start_row = self.flashcard_start_var.get() + 1  # +1 for header
+            end_row = self.flashcard_end_var.get() + 1
+            
+            self.flashcard_data = []
+            for row in ws.iter_rows(min_row=start_row, max_row=end_row, values_only=True):
+                word_val = row[word_col] if len(row) > word_col else None
+                if word_val:  # Has word
+                    self.flashcard_data.append({
+                        "word": str(word_val) if word_val else "",
+                        "meaning": str(row[meaning_col]) if len(row) > meaning_col and row[meaning_col] else "",
+                        "example_en": str(row[example_en_col]) if len(row) > example_en_col and row[example_en_col] else "",
+                        "example_vi": str(row[example_vi_col]) if len(row) > example_vi_col and row[example_vi_col] else "",
+                        "known": False
+                    })
+            
+            if not self.flashcard_data:
+                messagebox.showwarning("Cảnh báo", "⚠️ Không có dữ liệu trong phạm vi đã chọn!")
+                return
+            
+            # Reset state
+            self.flashcard_current_idx = 0
+            self.flashcard_showing_answer = False
+            self.flashcard_known_count = 0
+            self.flashcard_unknown_count = 0
+            
+            # Enable buttons
+            self.flashcard_prev_btn.config(state=tk.NORMAL)
+            self.flashcard_flip_btn.config(state=tk.NORMAL)
+            self.flashcard_next_btn.config(state=tk.NORMAL)
+            self.flashcard_known_btn.config(state=tk.NORMAL)
+            self.flashcard_unknown_btn.config(state=tk.NORMAL)
+            
+            # Display first card
+            self._display_flashcard()
+            
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"❌ Không thể đọc file: {str(e)}")
+    
+    def _display_flashcard(self):
+        """Hiển thị thẻ flashcard hiện tại"""
+        if not self.flashcard_data:
+            return
+        
+        card = self.flashcard_data[self.flashcard_current_idx]
+        
+        # Update progress
+        current = self.flashcard_current_idx + 1
+        total = len(self.flashcard_data)
+        self.flashcard_progress_label.config(text=f"Thẻ {current}/{total}")
+        self.flashcard_progress_bar['value'] = (current / total) * 100
+        
+        # Update stats
+        self.flashcard_stats_label.config(
+            text=f"✅ {self.flashcard_known_count}  |  ❌ {self.flashcard_unknown_count}"
+        )
+        
+        # Update card content
+        self.flashcard_front_label.config(text=card["word"])
+        self.flashcard_meaning_label.config(text=f"💬 {card['meaning']}")
+        
+        example_text = ""
+        if card["example_en"]:
+            example_text = f"📝 {card['example_en']}"
+        if card["example_vi"]:
+            example_text += f"\n🔄 {card['example_vi']}"
+        self.flashcard_example_label.config(text=example_text)
+        
+        # Show front side
+        self.flashcard_showing_answer = False
+        self.flashcard_front_frame.place(relx=0, rely=0, relwidth=1, relheight=1)
+        self.flashcard_back_frame.place_forget()
+        
+        # Update card background based on known status
+        if card.get("known"):
+            self.flashcard_front_frame.config(bg="#c8e6c9")
+            self.flashcard_front_label.config(bg="#c8e6c9", fg="#2e7d32")
+        else:
+            self.flashcard_front_frame.config(bg="#e3f2fd")
+            self.flashcard_front_label.config(bg="#e3f2fd", fg="#1565c0")
+    
+    def _flip_flashcard(self, event):
+        """Lật thẻ flashcard"""
+        if not self.flashcard_data:
+            return
+        
+        if self.flashcard_showing_answer:
+            # Show front
+            self.flashcard_front_frame.place(relx=0, rely=0, relwidth=1, relheight=1)
+            self.flashcard_back_frame.place_forget()
+        else:
+            # Show back
+            self.flashcard_back_frame.place(relx=0, rely=0, relwidth=1, relheight=1)
+            self.flashcard_front_frame.place_forget()
+        
+        self.flashcard_showing_answer = not self.flashcard_showing_answer
+    
+    def _flashcard_prev(self):
+        """Chuyển về thẻ trước"""
+        if self.flashcard_current_idx > 0:
+            self.flashcard_current_idx -= 1
+            self._display_flashcard()
+    
+    def _flashcard_next(self):
+        """Chuyển sang thẻ tiếp theo"""
+        if self.flashcard_current_idx < len(self.flashcard_data) - 1:
+            self.flashcard_current_idx += 1
+            self._display_flashcard()
+        else:
+            # End of deck - show summary
+            self._show_flashcard_summary()
+    
+    def _rate_flashcard(self, known: bool):
+        """Đánh giá thẻ: đã thuộc hoặc chưa thuộc"""
+        if not self.flashcard_data:
+            return
+        
+        card = self.flashcard_data[self.flashcard_current_idx]
+        
+        # Update count
+        if known and not card.get("known"):
+            self.flashcard_known_count += 1
+            if card.get("marked_unknown"):
+                self.flashcard_unknown_count -= 1
+        elif not known and not card.get("marked_unknown"):
+            self.flashcard_unknown_count += 1
+            if card.get("known"):
+                self.flashcard_known_count -= 1
+        
+        card["known"] = known
+        card["marked_unknown"] = not known
+        
+        # Auto next
+        self._flashcard_next()
+    
+    def _show_flashcard_summary(self):
+        """Hiển thị tổng kết Flashcard session"""
+        total = len(self.flashcard_data)
+        known = self.flashcard_known_count
+        unknown = self.flashcard_unknown_count
+        not_rated = total - known - unknown
+        
+        summary = f"""
+🎉 HOÀN THÀNH FLASHCARD SESSION!
+
+📊 Kết quả:
+   ✅ Đã thuộc: {known}/{total} ({known*100//total if total > 0 else 0}%)
+   ❌ Chưa thuộc: {unknown}/{total} ({unknown*100//total if total > 0 else 0}%)
+   ⏭️ Bỏ qua: {not_rated}/{total}
+
+💡 Mẹo: Ôn lại các từ chưa thuộc thường xuyên!
+"""
+        messagebox.showinfo("🃏 Flashcard - Kết quả", summary)
+    
+    def _speak_flashcard_word(self):
+        """Phát âm từ trong flashcard - hỗ trợ nhiều ngôn ngữ"""
+        if not self.flashcard_data:
+            return
+        
+        card = self.flashcard_data[self.flashcard_current_idx]
+        word = card.get("word", "")
+        
+        if not word:
+            return
+        
+        # Xác định ngôn ngữ từ tên file
+        file_name = getattr(self, 'flashcard_file', '').lower()
+        if 'chinese' in file_name or 'zh' in file_name or 'hán' in file_name:
+            lang_code = "zh-cn"
+        elif 'japanese' in file_name or 'ja' in file_name or 'nhật' in file_name:
+            lang_code = "ja"
+        else:
+            lang_code = "en"
+        
+        def speak_async():
+            try:
+                from gtts import gTTS
+                import tempfile
+                import os
+                from pygame import mixer
+                
+                # Get speed
+                speed = getattr(self, 'voice_speed_var', None)
+                slow = speed.get() < 0.8 if speed else False
+                
+                tts = gTTS(text=word, lang=lang_code, slow=slow)
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
+                    temp_path = f.name
+                tts.save(temp_path)
+                
+                mixer.init()
+                mixer.music.load(temp_path)
+                mixer.music.play()
+                while mixer.music.get_busy():
+                    import time
+                    time.sleep(0.1)
+                mixer.quit()
+                os.unlink(temp_path)
+            except Exception as e:
+                print(f"⚠️ TTS error: {e}")
+                # Fallback to winsound beep
+                try:
+                    import winsound
+                    winsound.Beep(440, 200)
+                except:
+                    pass
+        
+        import threading
+        threading.Thread(target=speak_async, daemon=True).start()
     
     def _create_guide_tab(self):
         """⚡ Tab hướng dẫn chi tiết"""
@@ -1243,19 +2269,84 @@ class LanguageQuizGUI:
         
         self.quiz_type_str = self.quiz_type_var.get()
         
-        # Xử lý range - lấy tất cả câu trong khoảng
-        start_idx = self.start_question_var.get() - 1
-        end_idx = self.end_question_var.get()
+        # 📚 Check quiz mode: normal vs practice (weak questions)
+        quiz_mode = self.quiz_mode_var.get()
         
-        if start_idx < 0:
-            start_idx = 0
-        if end_idx > len(self.data):
-            end_idx = len(self.data)
-        if start_idx >= end_idx:
-            messagebox.showerror("Lỗi", f"❌ Khoảng không hợp lệ!\n\nTổng số câu: {len(self.data)}")
-            return
-        
-        selected_data = self.data[start_idx:end_idx]
+        if quiz_mode == "practice":
+            # 🎯 Practice Mode: Lấy câu yếu từ Smart Review DB
+            if not self.smart_review_db or not hasattr(self, 'selected_file'):
+                messagebox.showerror("Lỗi", "❌ Smart Review chưa khởi tạo!")
+                return
+            
+            try:
+                user_name = "Default"  # Hoặc lấy từ settings
+                weak_questions = self.smart_review_db.get_weak_questions(
+                    file_path=str(self.selected_file),
+                    user_name=user_name,
+                    limit=20  # Lấy tối đa 20 câu yếu
+                )
+                
+                if not weak_questions:
+                    messagebox.showinfo(
+                        "Practice Mode", 
+                        "🎉 Chưa có câu yếu nào!\n\n" +
+                        "Lý do:\n" +
+                        "• Bạn chưa làm quiz lần nào\n" +
+                        "• Hoặc bạn đã học tốt tất cả câu!\n\n" +
+                        "👉 Hãy làm Normal Quiz trước để hệ thống ghi nhận câu yếu."
+                    )
+                    return
+                
+                # Map weak questions back to data
+                weak_ids = {q['question_id'] for q in weak_questions}
+                
+                # DEBUG: Print để check
+                print(f"🔍 DEBUG: Weak IDs from DB: {weak_ids}")
+                print(f"🔍 DEBUG: Total data rows: {len(self.data)}")
+                if self.data:
+                    print(f"🔍 DEBUG: Sample data excel_row: {self.data[0].get('excel_row', 'NOT FOUND')}")
+                
+                selected_data = []
+                for q in self.data:
+                    excel_row = q.get("excel_row")
+                    if excel_row is None:
+                        # Fallback: use index + 2 (because Excel starts at row 2)
+                        excel_row = self.data.index(q) + 2
+                    if excel_row in weak_ids:
+                        selected_data.append(q)
+                
+                if not selected_data:
+                    messagebox.showwarning(
+                        "Practice Mode", 
+                        f"⚠️ Tìm thấy {len(weak_questions)} câu yếu trong DB\n" +
+                        f"Nhưng không khớp với file hiện tại!\n\n" +
+                        f"Weak IDs: {list(weak_ids)[:5]}...\n\n" +
+                        "Có thể bạn đã đổi file Excel hoặc thứ tự câu hỏi đã thay đổi.\n" +
+                        "👉 Hãy làm lại Normal Quiz với file này."
+                    )
+                    return
+                    
+                messagebox.showinfo("Practice Mode", f"🎯 Tìm thấy {len(selected_data)} câu yếu cần ôn tập!")
+                
+            except Exception as e:
+                messagebox.showerror("Lỗi", f"❌ Không thể tải câu yếu:\n{str(e)}")
+                import traceback
+                traceback.print_exc()
+                return
+        else:
+            # 📖 Normal Mode: Lấy theo range
+            start_idx = self.start_question_var.get() - 1
+            end_idx = self.end_question_var.get()
+            
+            if start_idx < 0:
+                start_idx = 0
+            if end_idx > len(self.data):
+                end_idx = len(self.data)
+            if start_idx >= end_idx:
+                messagebox.showerror("Lỗi", f"❌ Khoảng không hợp lệ!\n\nTổng số câu: {len(self.data)}")
+                return
+            
+            selected_data = self.data[start_idx:end_idx]
         
         self.quiz_engine = QuizEngine(selected_data, language="English")
         
@@ -1388,9 +2479,15 @@ class LanguageQuizGUI:
         quiz_mode = self.quiz_mode_var.get()
         
         if quiz_mode == "practice":
-            # Practice Mode: Load weak words from database (ALL languages)
+            # Practice Mode: Load weak words from database + match with Excel file
             try:
-                # Lấy tất cả từ yếu từ database (không phân biệt ngôn ngữ)
+                # 📂 First, load Excel file to get full data (word + meaning + examples)
+                self.data = self._read_excel_data(self.sheet_combo.get())
+                if not self.data:
+                    messagebox.showerror("Lỗi", "❌ Không đọc được file Excel!")
+                    return
+                
+                # 🔍 Get weak words from database
                 all_weak_words = []
                 for lang in ["English", "Japanese", "Chinese", "Vietnamese"]:
                     weak_words = self.study_db.get_weak_words(lang)
@@ -1404,28 +2501,34 @@ class LanguageQuizGUI:
                         "💡 Mẹo: Hãy thử chế độ Normal để học từ mới.")
                     return
                 
-                # Convert weak words to quiz format
+                # 🔗 Match weak words with Excel data to get full info
+                weak_word_texts = {w["word"].strip().lower() for w in all_weak_words}
+                
                 selected_data = []
-                for weak_word_dict in all_weak_words:
-                    # Format: {"word": word_text, "meaning": meaning, "language": lang, "wrong_count": X, "last_reviewed": timestamp}
-                    selected_data.append({
-                        "word": weak_word_dict["word"],
-                        "meaning": weak_word_dict.get("meaning", ""),
-                        "example_en": weak_word_dict.get("example_en", ""),
-                        "example_vi": weak_word_dict.get("example_vi", ""),
-                        "language": weak_word_dict["language"],
-                        "wrong_count": weak_word_dict["wrong_count"],
-                        "last_reviewed": weak_word_dict["last_reviewed"],
-                        "word_id": weak_word_dict.get("word_id", ""),
-                        "excel_row": 0  # Practice mode không có row trong Excel
-                    })
+                for excel_row in self.data:
+                    word_in_excel = excel_row.get("word", "").strip().lower()
+                    if word_in_excel in weak_word_texts:
+                        # Found matching word in Excel - has full data!
+                        selected_data.append(excel_row)
+                        print(f"✅ Matched weak word: '{excel_row.get('word')}' with meaning: '{excel_row.get('meaning', 'N/A')}'")
+                
+                if not selected_data:
+                    messagebox.showwarning(
+                        "Practice Mode",
+                        f"⚠️ Tìm thấy {len(all_weak_words)} từ yếu trong database\n"
+                        f"Nhưng không có từ nào khớp với file Excel hiện tại!\n\n"
+                        f"💡 Giải pháp:\n"
+                        f"• Chọn đúng file Excel mà bạn đã học trước đó\n"
+                        f"• Hoặc làm Normal Quiz với file này để tạo dữ liệu mới"
+                    )
+                    return
                 
                 num_questions = len(selected_data)
                 
                 # Thống kê theo ngôn ngữ
                 lang_stats = {}
                 for word in selected_data:
-                    lang = word["language"]
+                    lang = word.get("language", "Unknown")
                     lang_stats[lang] = lang_stats.get(lang, 0) + 1
                 
                 stats_text = ", ".join([f"{lang}: {count}" for lang, count in lang_stats.items()])
@@ -1434,7 +2537,8 @@ class LanguageQuizGUI:
                     f"🎯 CHẾ ĐỘ PRACTICE\n\n"
                     f"📚 Tổng số từ yếu: {num_questions}\n\n"
                     f"🌐 Phân bố:\n{stats_text}\n\n"
-                    f"💡 Hãy cố gắng trả lời đúng để cải thiện!")
+                    f"💡 Hãy cố gắng trả lời đúng để cải thiện!\n\n"
+                    f"👉 Nhấn OK để bắt đầu Voice Quiz ôn tập!")
                 
                 mode_text = f"🎯 Ôn tập từ yếu: {num_questions} từ cần học lại"
                 
@@ -1585,6 +2689,10 @@ class LanguageQuizGUI:
         
         self.voice_question_text.config(state=tk.DISABLED)
         
+        # 🔊 Save current question and enable speaker button
+        self.current_voice_question = question
+        self.speak_question_btn.config(state=tk.NORMAL)
+        
         current = self.current_question_idx + 1
         total = len(self.quiz_engine.questions)
         self.voice_progress_label.config(text=f"Câu {current}/{total}")
@@ -1612,6 +2720,14 @@ class LanguageQuizGUI:
             if not self.quiz_active:
                 print("⏹️ Quiz đã dừng, bỏ qua câu hỏi này")
                 return
+            
+            # 🚀 Check if paused before processing
+            while hasattr(self, 'voice_quiz_paused') and self.voice_quiz_paused:
+                if not self.quiz_active:
+                    print("⏹️ Quiz đã dừng khi đang tạm dừng")
+                    return
+                time.sleep(0.5)  # Wait while paused
+            
             # Đặt lại voice preference mỗi lần câu hỏi (phòng reset)
             # Voice preferences saved in user_settings
             
@@ -1852,6 +2968,10 @@ class LanguageQuizGUI:
                 for _ in range(listen_timeout * 2):  # Chạy theo timeout
                     if not self.app_running:
                         break
+                    # Check if paused
+                    if hasattr(self, 'voice_quiz_paused') and self.voice_quiz_paused:
+                        time.sleep(0.5)
+                        continue
                     level = random.randint(20, 80)
                     try:
                         self.root.after(0, lambda l=level: self.mic_level_bar.config(value=l))
@@ -1886,7 +3006,26 @@ class LanguageQuizGUI:
                     "attempt": 1
                 })
                 
-                # 🚀 Tự động tiến tới câu tiếp (thay vì treo)
+                # � Save to Smart Review DB
+                if self.smart_review_db and hasattr(self, 'selected_file'):
+                    try:
+                        user_name = self.quiz_results[0].get("user_name", "Unknown") if self.quiz_results else "Unknown"
+                        self.smart_review_db.save_question_result(
+                            file_path=str(self.selected_file),
+                            question_id=question_num,
+                            question_text=question.get("word", ""),
+                            correct_answer=correct_answer,
+                            user_name=user_name,
+                            quiz_type=self.quiz_type_str,
+                            test_mode=self.test_mode,
+                            is_correct=False,
+                            user_answer="(Không trả lời)",
+                            score=0
+                        )
+                    except Exception as e:
+                        print(f"⚠️ Smart Review save error: {e}")
+                
+                # �🚀 Tự động tiến tới câu tiếp (thay vì treo)
                 time.sleep(2)
                 if self.quiz_active:
                     self._safe_next_question()
@@ -1915,6 +3054,25 @@ class LanguageQuizGUI:
                 "score": score,
                 "attempt": 1
             })
+            
+            # 📚 Save to Smart Review DB
+            if self.smart_review_db and hasattr(self, 'selected_file'):
+                try:
+                    user_name = self.quiz_results[0].get("user_name", "Unknown") if self.quiz_results else "Unknown"
+                    self.smart_review_db.save_question_result(
+                        file_path=str(self.selected_file),
+                        question_id=question_num,
+                        question_text=question.get("word", ""),
+                        correct_answer=correct_answer,
+                        user_name=user_name,
+                        quiz_type=self.quiz_type_str,
+                        test_mode=self.test_mode,
+                        is_correct=is_correct,
+                        user_answer=user_answer,
+                        score=score
+                    )
+                except Exception as e:
+                    print(f"⚠️ Smart Review save error: {e}")
             
             # Phát feedback - SONG SONG: Popup ngay + TTS chạy thread riêng (hoặc bỏ TTS nếu faster_feedback)
             use_faster_feedback = self.faster_feedback_var.get()
@@ -2032,12 +3190,24 @@ class LanguageQuizGUI:
                 # Phát TTS trong thread riêng, tự đóng popup khi xong
                 use_polly = (answer_lang != "vi")
                 def play_tts_async():
+                    # Check pause state before TTS
+                    while hasattr(self, 'voice_quiz_paused') and self.voice_quiz_paused:
+                        if not self.quiz_active:
+                            return
+                        time.sleep(0.5)
+                    
                     if use_faster_feedback:
                         # Chế độ nhanh: chỉ hiển thị 0.5s rồi đến câu tiếp
                         time.sleep(0.5)
                     else:
                         # Chế độ bình thường: phát TTS
                         self.voice_manager.voice_manager.speak_google_tts(feedback_text, language=bot_lang)
+                        
+                        # Check pause before speaking answer
+                        while hasattr(self, 'voice_quiz_paused') and self.voice_quiz_paused:
+                            if not self.quiz_active:
+                                return
+                            time.sleep(0.5)
                         
                         # Dùng Polly cho Anh/Trung/Nhật, gTTS cho Việt
                         if answer_lang in ["en", "zh", "ja"]:
@@ -2798,6 +3968,30 @@ class LanguageQuizGUI:
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(self.quiz_results, f, ensure_ascii=False, indent=2)
             
+            # 💾 Save to leaderboard database
+            try:
+                total_points = sum(r.get("score", 0) for r in self.quiz_results)
+                num_questions = len(self.quiz_results)
+                avg_score = (total_points / (num_questions * 10)) * 100 if num_questions > 0 else 0
+                
+                quiz_lang = self._get_quiz_language_code()
+                file_name_only = Path(self.selected_file).name if hasattr(self, 'selected_file') and self.selected_file else "Unknown"
+                
+                conn = sqlite3.connect('study_history.db')
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO quiz_results (user_name, score, total_questions, language, file_name)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (user_name, avg_score, num_questions, quiz_lang, file_name_only))
+                conn.commit()
+                conn.close()
+                
+                # Refresh leaderboard
+                self._load_leaderboard()
+                print(f"✅ Đã lưu điểm {avg_score:.1f} vào leaderboard")
+            except Exception as lb_err:
+                print(f"⚠️ Lỗi lưu leaderboard: {lb_err}")
+            
             # 🎓 Log answers to database for spaced repetition
             try:
                 if self.selected_file:
@@ -3136,6 +4330,697 @@ class LanguageQuizGUI:
             # Default based on first word
             return "Unknown"
     
+    def _speak_current_question(self):
+        """🔊 Phát âm từ trong câu hỏi hiện tại"""
+        if not hasattr(self, 'current_voice_question') or not self.current_voice_question:
+            return
+        
+        question = self.current_voice_question
+        word_to_speak = question.get("word", "")
+        
+        if not word_to_speak:
+            return
+        
+        # Xác định ngôn ngữ để chọn voice đúng
+        language = question.get("language", "English")
+        
+        def speak_async():
+            try:
+                if language == "English":
+                    # Use AWS Polly for English
+                    voice = "Joanna" if self.en_voice_var.get() == "female" else "Matthew"
+                    self._speak_with_polly(word_to_speak, voice, "en-US")
+                elif language == "Japanese":
+                    # Use AWS Polly for Japanese
+                    voice = "Mizuki" if self.ja_voice_var.get() == "female" else "Takumi"
+                    self._speak_with_polly(word_to_speak, voice, "ja-JP")
+                else:
+                    # Fallback to gTTS
+                    from gtts import gTTS
+                    import tempfile
+                    import os
+                    from pygame import mixer
+                    
+                    lang_code = "en" if language == "English" else "ja" if language == "Japanese" else "zh-cn"
+                    tts = gTTS(text=word_to_speak, lang=lang_code, slow=False)
+                    
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
+                        temp_path = f.name
+                    
+                    tts.save(temp_path)
+                    
+                    mixer.init()
+                    mixer.music.load(temp_path)
+                    mixer.music.play()
+                    
+                    while mixer.music.get_busy():
+                        import time
+                        time.sleep(0.1)
+                    
+                    mixer.quit()
+                    os.unlink(temp_path)
+            except Exception as e:
+                print(f"⚠️ TTS error: {e}")
+        
+        import threading
+        threading.Thread(target=speak_async, daemon=True).start()
+    
+    def _speak_practice_question(self):
+        """🔊 Phát âm câu hỏi Practice Quiz (dịch câu)"""
+        if not hasattr(self, 'current_practice_question') or not self.current_practice_question:
+            return
+        
+        question = self.current_practice_question
+        # Lấy câu cần đọc (câu tiếng Anh hoặc tiếng Nhật)
+        text_to_speak = question.get("question_sentence", "")
+        
+        if not text_to_speak:
+            return
+        
+        # Xác định ngôn ngữ từ câu
+        language = question.get("language", "English")
+        
+        def speak_async():
+            try:
+                if language == "English":
+                    voice = "Joanna" if self.en_voice_var.get() == "female" else "Matthew"
+                    self._speak_with_polly(text_to_speak, voice, "en-US")
+                elif language == "Japanese":
+                    voice = "Mizuki" if self.ja_voice_var.get() == "female" else "Takumi"
+                    self._speak_with_polly(text_to_speak, voice, "ja-JP")
+                else:
+                    from gtts import gTTS
+                    import tempfile
+                    import os
+                    from pygame import mixer
+                    
+                    lang_code = "en" if language == "English" else "ja" if language == "Japanese" else "zh-cn"
+                    tts = gTTS(text=text_to_speak, lang=lang_code, slow=False)
+                    
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
+                        temp_path = f.name
+                    
+                    tts.save(temp_path)
+                    
+                    mixer.init()
+                    mixer.music.load(temp_path)
+                    mixer.music.play()
+                    
+                    while mixer.music.get_busy():
+                        import time
+                        time.sleep(0.1)
+                    
+                    mixer.quit()
+                    os.unlink(temp_path)
+            except Exception as e:
+                print(f"⚠️ Practice TTS error: {e}")
+        
+        import threading
+        threading.Thread(target=speak_async, daemon=True).start()
+    
+    def _speak_with_polly(self, text, voice_id, language_code):
+        """Speak text using AWS Polly with speed control"""
+        try:
+            import boto3
+            from pygame import mixer
+            import tempfile
+            import os
+            
+            # Get voice speed
+            speed = getattr(self, 'voice_speed_var', None)
+            speed_rate = speed.get() if speed else 1.0
+            
+            # Use boto3 for AWS Polly
+            polly = boto3.client(
+                'polly',
+                region_name='us-east-1',
+                aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+                aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
+            )
+            
+            # Determine engine based on voice - Mizuki and Takumi only support 'standard'
+            # Neural voices: Matthew, Joanna, Amy, etc.
+            # Standard only voices: Mizuki, Takumi
+            standard_only_voices = ['Mizuki', 'Takumi', 'Zhiyu']
+            engine = 'standard' if voice_id in standard_only_voices else 'neural'
+            
+            # Apply SSML for speed control
+            ssml_text = f'<speak><prosody rate="{int(speed_rate * 100)}%">{text}</prosody></speak>'
+            
+            response = polly.synthesize_speech(
+                Text=ssml_text,
+                TextType='ssml',
+                OutputFormat='mp3',
+                VoiceId=voice_id,
+                Engine=engine
+            )
+            
+            # Save to temp file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
+                f.write(response['AudioStream'].read())
+                temp_path = f.name
+            
+            # Play with pygame - ensure mixer is initialized
+            if not mixer.get_init():
+                mixer.init()
+            mixer.music.load(temp_path)
+            mixer.music.play()
+            
+            while mixer.music.get_busy():
+                import time
+                time.sleep(0.1)
+            
+            # Don't quit mixer, just unload
+            mixer.music.unload()
+            os.unlink(temp_path)
+        except Exception as e:
+            print(f"⚠️ Polly error: {e}")
+    
+    def _update_speed_label(self, value):
+        """Cập nhật label hiển thị tốc độ"""
+        speed = float(value)
+        self.voice_speed_label.config(text=f"{speed:.1f}x")
+    
+    def _set_voice_speed(self, speed):
+        """Đặt tốc độ voice nhanh"""
+        self.voice_speed_var.set(speed)
+        self.voice_speed_label.config(text=f"{speed:.1f}x")
+    
+    def _play_sound(self, sound_type):
+        """🔊 Phát âm thanh cho Practice Quiz
+        sound_type: 'click', 'correct', 'wrong'
+        """
+        def play_async():
+            try:
+                import winsound
+                import time
+                if sound_type == 'click':
+                    winsound.Beep(440, 50)
+                elif sound_type == 'correct':
+                    winsound.Beep(523, 100)  # C5
+                    time.sleep(0.05)
+                    winsound.Beep(659, 100)  # E5
+                    time.sleep(0.05)
+                    winsound.Beep(784, 150)  # G5
+                elif sound_type == 'wrong':
+                    winsound.Beep(400, 150)
+                    time.sleep(0.05)
+                    winsound.Beep(300, 250)
+            except Exception as e:
+                print(f"⚠️ Sound error: {e}")
+        
+        # Play in thread to not block UI
+        import threading
+        threading.Thread(target=play_async, daemon=True).start()
+    
+    def _practice_select_file(self):
+        """Chọn file cho Practice Quiz"""
+        from tkinter import filedialog
+        file_path = filedialog.askopenfilename(
+            title="Chọn File Excel",
+            filetypes=[("Excel files", "*.xlsx *.xls"), ("All files", "*.*")]
+        )
+        if file_path:
+            self.practice_selected_file = file_path
+            self.practice_file_label.config(
+                text=file_path.split("/")[-1].split("\\")[-1],  # Get filename only
+                foreground="green"
+            )
+            # 💾 Lưu vào settings
+            self.user_settings["practice_file"] = file_path
+            self._save_settings()
+    
+    def _start_practice_quiz(self):
+        """Bắt đầu Practice Quiz với Multiple Choice"""
+        if not hasattr(self, 'practice_selected_file'):
+            messagebox.showerror("Lỗi", "❌ Vui lòng chọn file Excel!")
+            return
+        
+        # Read data
+        try:
+            data = self._read_excel_data_practice(self.practice_selected_file)
+            if not data:
+                messagebox.showerror("Lỗi", "❌ Không đọc được dữ liệu từ file!")
+                return
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"❌ Lỗi đọc file:\n{str(e)}")
+            return
+        
+        # Get range
+        start_idx = self.practice_start_var.get() - 1
+        end_idx = self.practice_end_var.get()
+        
+        if start_idx < 0:
+            start_idx = 0
+        if end_idx > len(data):
+            end_idx = len(data)
+        if start_idx >= end_idx:
+            messagebox.showerror("Lỗi", f"❌ Khoảng không hợp lệ!\n\nTổng số câu: {len(data)}")
+            return
+        
+        self.practice_questions = data[start_idx:end_idx]
+        self.practice_current_idx = 0
+        self.practice_results = []
+        
+        # Display first question
+        self._display_practice_question()
+    
+    def _read_excel_data_practice(self, file_path):
+        """Đọc dữ liệu Excel cho Practice Quiz (simplified)"""
+        import openpyxl
+        import os
+        wb = openpyxl.load_workbook(file_path)
+        ws = wb.active  # Default to first sheet
+        
+        # Detect language from filename
+        filename = os.path.basename(file_path).lower()
+        if 'nhat' in filename or 'japanese' in filename or 'ja' in filename:
+            detected_lang = "Japanese"
+        elif 'trung' in filename or 'chinese' in filename or 'zh' in filename:
+            detected_lang = "Chinese"
+        else:
+            detected_lang = "English"
+        
+        self.practice_detected_language = detected_lang
+        print(f"📚 Practice Quiz - Detected language: {detected_lang}")
+        
+        data = []
+        for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            if not row[0]:  # Skip empty rows
+                continue
+            data.append({
+                "excel_row": idx - 1,
+                "word": row[1] if len(row) > 1 else "",
+                "meaning": row[2] if len(row) > 2 else "",
+                "example_en": row[3] if len(row) > 3 else "",
+                "example_vi": row[4] if len(row) > 4 else "",
+                "language": detected_lang
+            })
+        return data
+    
+    def _display_practice_question(self):
+        """Hiển thị câu hỏi Multiple Choice"""
+        if self.practice_current_idx >= len(self.practice_questions):
+            self._show_practice_results()
+            return
+        
+        question = self.practice_questions[self.practice_current_idx]
+        quiz_type = self.practice_quiz_type_var.get()
+        
+        # Get question text
+        if quiz_type == "meaning":
+            question_text = f"💬 Nghĩa của từ:\n\n{question['word']}"
+            correct_answer = question['meaning']
+            question_sentence = question['word']  # For TTS
+        else:  # example
+            question_text = f"📝 Dịch câu sau:\n\n{question['example_en']}"
+            correct_answer = question['example_vi']
+            question_sentence = question['example_en']  # For TTS
+        
+        # Store current question for TTS - use detected language
+        detected_lang = getattr(self, 'practice_detected_language', question.get("language", "English"))
+        self.current_practice_question = {
+            "language": detected_lang,
+            "question_sentence": question_sentence
+        }
+        
+        # Enable speaker button
+        self.practice_speak_btn.config(state=tk.NORMAL)
+        
+        # Generate distractors (3 wrong answers) - SMARTER
+        import random
+        all_answers = [q.get('meaning' if quiz_type == 'meaning' else 'example_vi', '') 
+                      for q in self.practice_questions]
+        all_answers = [a for a in all_answers if a and a != correct_answer]
+        
+        if len(all_answers) < 3:
+            # Not enough distractors, add placeholders
+            distractors = all_answers + ["...", "...", "..."][:3 - len(all_answers)]
+        else:
+            # 🧠 SMART DISTRACTOR: Prioritize answers with similar length
+            correct_len = len(correct_answer)
+            
+            # Score each answer by length similarity
+            scored_answers = []
+            for ans in all_answers:
+                length_diff = abs(len(ans) - correct_len)
+                # Lower score = better (more similar length)
+                scored_answers.append((ans, length_diff))
+            
+            # Sort by length similarity
+            scored_answers.sort(key=lambda x: x[1])
+            
+            # Take top 10 candidates, then random sample 3 from them
+            candidates = [ans for ans, score in scored_answers[:min(10, len(scored_answers))]]
+            distractors = random.sample(candidates, min(3, len(candidates)))
+            
+            # If still not enough, add random ones
+            if len(distractors) < 3:
+                remaining = [a for a in all_answers if a not in distractors]
+                distractors += random.sample(remaining, 3 - len(distractors))
+        
+        # Shuffle options
+        options = [correct_answer] + distractors
+        random.shuffle(options)
+        
+        # Store correct answer
+        self.practice_correct_answer = correct_answer
+        self.practice_options = {
+            "A": options[0],
+            "B": options[1],
+            "C": options[2],
+            "D": options[3]
+        }
+        
+        # Update UI - Dùng Label
+        self.practice_question_label.config(text=question_text)
+        
+        # Update buttons - FULL TEXT không cắt
+        self.practice_btn_a.config(text=f"A. {options[0]}", state=tk.NORMAL, bg="#bbdefb", fg="#000000")
+        self.practice_btn_b.config(text=f"B. {options[1]}", state=tk.NORMAL, bg="#c8e6c9", fg="#000000")
+        self.practice_btn_c.config(text=f"C. {options[2]}", state=tk.NORMAL, bg="#ffe0b2", fg="#000000")
+        self.practice_btn_d.config(text=f"D. {options[3]}", state=tk.NORMAL, bg="#f8bbd0", fg="#000000")
+        
+        # Update progress
+        current = self.practice_current_idx + 1
+        total = len(self.practice_questions)
+        self.practice_progress_label.config(text=f"Câu {current}/{total}")
+        self.practice_progress_bar['value'] = (current / total) * 100
+        
+        # Clear feedback
+        self.practice_feedback_text.config(state=tk.NORMAL)
+        self.practice_feedback_text.delete(1.0, tk.END)
+        self.practice_feedback_text.config(state=tk.DISABLED)
+        
+        # ⏱️ Start timer countdown (30 seconds per question)
+        self.practice_timer_seconds = 30
+        self._update_practice_timer()
+        
+        # Enable pause button
+        self.practice_pause_btn.config(state=tk.NORMAL)
+        # 🔊 Auto TTS - Đọc câu hỏi khi hiển thị (tùy chọn)
+        # Uncomment dòng dưới nếu muốn tự động đọc:
+        # self._speak_practice_question()
+    
+    def _practice_submit_answer(self, choice):
+        """Xử lý khi chọn đáp án A/B/C/D"""
+        # 🔊 Click sound
+        self._play_sound('click')
+        
+        # Stop timer
+        self.practice_timer_seconds = -1
+        
+        user_answer = self.practice_options[choice]
+        is_correct = (user_answer == self.practice_correct_answer)
+        score = 10 if is_correct else 0
+        
+        # Highlight correct/wrong
+        btn = getattr(self, f"practice_btn_{choice.lower()}")
+        if is_correct:
+            # 🔊 Correct sound
+            self._play_sound('correct')
+            btn.config(bg="#4caf50", fg="white")  # Green for correct
+            feedback_msg = f"✅ CHÍNH XÁC! (+{score} điểm)\n\n💡 Đáp án đúng: {self.practice_correct_answer}"
+        else:
+            # 🔊 Wrong sound
+            self._play_sound('wrong')
+            btn.config(bg="#f44336", fg="white")  # Red for wrong
+            # Find correct button and highlight
+            for opt, ans in self.practice_options.items():
+                if ans == self.practice_correct_answer:
+                    correct_btn = getattr(self, f"practice_btn_{opt.lower()}")
+                    correct_btn.config(bg="#4caf50", fg="white")
+                    break
+            feedback_msg = f"❌ SAI RỒI! (+{score} điểm)\n\n💡 Đáp án đúng: {self.practice_correct_answer}"
+        
+        # Show feedback
+        self.practice_feedback_text.config(state=tk.NORMAL)
+        self.practice_feedback_text.delete(1.0, tk.END)
+        self.practice_feedback_text.insert(tk.END, feedback_msg)
+        self.practice_feedback_text.config(state=tk.DISABLED)
+        
+        # Disable buttons
+        self.practice_btn_a.config(state=tk.DISABLED)
+        self.practice_btn_b.config(state=tk.DISABLED)
+        self.practice_btn_c.config(state=tk.DISABLED)
+        self.practice_btn_d.config(state=tk.DISABLED)
+        
+        # Save result
+        question = self.practice_questions[self.practice_current_idx]
+        self.practice_results.append({
+            "question_num": question['excel_row'],
+            "question": question['word'],
+            "user_answer": user_answer,
+            "correct_answer": self.practice_correct_answer,
+            "score": score,
+            "is_correct": is_correct
+        })
+        
+        # Save to Smart Review DB
+        if self.smart_review_db and hasattr(self, 'practice_selected_file'):
+            try:
+                self.smart_review_db.save_question_result(
+                    file_path=str(self.practice_selected_file),
+                    question_id=question['excel_row'],
+                    question_text=question.get('word', ''),
+                    correct_answer=self.practice_correct_answer,
+                    user_name="Default",
+                    quiz_type="practice_" + self.practice_quiz_type_var.get(),
+                    test_mode=0,  # Practice mode
+                    is_correct=is_correct,
+                    user_answer=user_answer,
+                    score=score
+                )
+            except Exception as e:
+                print(f"⚠️ Smart Review save error: {e}")
+        
+        # Next question after 2 seconds
+        self.root.after(2000, self._next_practice_question)
+    
+    def _next_practice_question(self):
+        """Chuyển sang câu tiếp theo"""
+        self.practice_current_idx += 1
+        self._display_practice_question()
+    
+    def _update_practice_timer(self):
+        """Cập nhật timer countdown mỗi giây"""
+        # Check if paused
+        if hasattr(self, 'practice_paused') and self.practice_paused:
+            self.root.after(1000, self._update_practice_timer)
+            return
+        
+        if self.practice_timer_seconds < 0:
+            # Timer stopped
+            self.practice_timer_label.config(text="")
+            return
+        
+        if self.practice_timer_seconds == 0:
+            # Time's up! Auto-submit random answer
+            self.practice_timer_label.config(text="⏰ Hết giờ!", foreground="red")
+            
+            # Disable buttons
+            self.practice_btn_a.config(state=tk.DISABLED)
+            self.practice_btn_b.config(state=tk.DISABLED)
+            self.practice_btn_c.config(state=tk.DISABLED)
+            self.practice_btn_d.config(state=tk.DISABLED)
+            
+            # Show feedback
+            self.practice_feedback_text.config(state=tk.NORMAL)
+            self.practice_feedback_text.delete(1.0, tk.END)
+            self.practice_feedback_text.insert(tk.END, f"⏰ HẾT GIỜ! (+0 điểm)\n\n💡 Đáp án đúng: {self.practice_correct_answer}")
+            self.practice_feedback_text.config(state=tk.DISABLED)
+            
+            # Save result (timeout = wrong answer)
+            question = self.practice_questions[self.practice_current_idx]
+            self.practice_results.append({
+                "question_num": question['excel_row'],
+                "question": question['word'],
+                "user_answer": "(Hết giờ)",
+                "correct_answer": self.practice_correct_answer,
+                "score": 0,
+                "is_correct": False
+            })
+            
+            # Save to Smart Review DB
+            if self.smart_review_db and hasattr(self, 'practice_selected_file'):
+                try:
+                    self.smart_review_db.save_question_result(
+                        file_path=str(self.practice_selected_file),
+                        question_id=question['excel_row'],
+                        question_text=question.get('word', ''),
+                        correct_answer=self.practice_correct_answer,
+                        user_name="Default",
+                        quiz_type="practice_" + self.practice_quiz_type_var.get(),
+                        test_mode=0,
+                        is_correct=False,
+                        user_answer="(Hết giờ)",
+                        score=0
+                    )
+                except Exception as e:
+                    print(f"⚠️ Smart Review save error: {e}")
+            
+            # Next question after 2 seconds
+            self.root.after(2000, self._next_practice_question)
+            return
+        
+        # Update timer display
+        self.practice_timer_label.config(
+            text=f"⏱️ {self.practice_timer_seconds}s",
+            foreground="#ff5722" if self.practice_timer_seconds <= 10 else "#4caf50"
+        )
+        
+        # Countdown
+        self.practice_timer_seconds -= 1
+        
+        # Schedule next update in 1 second
+        self.root.after(1000, self._update_practice_timer)
+    
+    def _show_practice_results(self):
+        """Hiển thị kết quả Practice Quiz"""
+        if not self.practice_results:
+            return
+        
+        total_score = sum(r['score'] for r in self.practice_results)
+        total_questions = len(self.practice_results)
+        correct_count = sum(1 for r in self.practice_results if r['is_correct'])
+        
+        result_msg = f"""
+🎉 HOÀN THÀNH PRACTICE QUIZ!
+
+📊 Kết quả:
+   • Tổng số câu: {total_questions}
+   • Đúng: {correct_count}/{total_questions}
+   • Điểm: {total_score}/{total_questions * 10}
+   • Độ chính xác: {correct_count/total_questions*100:.1f}%
+        """
+        
+        messagebox.showinfo("Kết quả", result_msg)
+        
+        # Reset UI - Use Label instead of ScrolledText
+        self.practice_question_label.config(text="Đã hoàn thành! Nhấn 'Bắt Đầu Practice' để làm lại.")
+    
+    def export_smart_review_stats(self):
+        """📊 Export Smart Review statistics to Excel"""
+        if not self.smart_review_db:
+            messagebox.showerror("Lỗi", "❌ Smart Review chưa khởi tạo!")
+            return
+        
+        if not hasattr(self, 'selected_file') or not self.selected_file:
+            messagebox.showwarning("Cảnh báo", "⚠️ Vui lòng chọn file Excel trước!")
+            return
+        
+        try:
+            from openpyxl import Workbook
+            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+            from datetime import datetime
+            from tkinter import filedialog
+            
+            user_name = "Default"  # Or get from settings
+            
+            # Get stats
+            stats = self.smart_review_db.get_mastery_stats(str(self.selected_file), user_name)
+            weak_questions = self.smart_review_db.get_weak_questions(
+                str(self.selected_file), user_name, limit=100
+            )
+            
+            # Create workbook
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Smart Review Stats"
+            
+            # Header styling
+            header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+            header_font = Font(bold=True, color="FFFFFF", size=12)
+            border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+            
+            # Title
+            ws.merge_cells('A1:G1')
+            ws['A1'] = f"📊 SMART REVIEW STATISTICS - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+            ws['A1'].font = Font(bold=True, size=14, color="366092")
+            ws['A1'].alignment = Alignment(horizontal='center', vertical='center')
+            
+            # Overall stats
+            ws['A3'] = "📈 TỔNG QUAN"
+            ws['A3'].font = Font(bold=True, size=12, color="366092")
+            
+            stats_data = [
+                ["Tổng số câu", stats.get('total', 0)],
+                ["Câu thành thạo (mastery = 5)", stats.get('mastered', 0)],
+                ["Câu tốt (mastery >= 3)", stats.get('good', 0)],
+                ["Câu yếu (mastery < 3)", stats.get('weak', 0)]
+            ]
+            
+            for idx, (label, value) in enumerate(stats_data, start=4):
+                ws[f'A{idx}'] = label
+                ws[f'B{idx}'] = value
+                ws[f'A{idx}'].font = Font(bold=True)
+            
+            # Weak questions table
+            ws['A9'] = "🎯 CÂU HỎI YẾU (Cần ôn tập)"
+            ws['A9'].font = Font(bold=True, size=12, color="366092")
+            
+            # Table headers
+            headers = ["STT", "Question ID", "Câu hỏi", "Đáp án đúng", "Mastery", "Attempts", "Lần cuối"]
+            for col_idx, header in enumerate(headers, start=1):
+                cell = ws.cell(row=10, column=col_idx)
+                cell.value = header
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+                cell.border = border
+            
+            # Weak questions data
+            for row_idx, q in enumerate(weak_questions, start=11):
+                ws.cell(row=row_idx, column=1, value=row_idx - 10)
+                ws.cell(row=row_idx, column=2, value=q['question_id'])
+                ws.cell(row=row_idx, column=3, value=q.get('question_text', ''))
+                ws.cell(row=row_idx, column=4, value=q.get('correct_answer', ''))
+                ws.cell(row=row_idx, column=5, value=q['mastery_level'])
+                ws.cell(row=row_idx, column=6, value=q['attempt_count'])
+                ws.cell(row=row_idx, column=7, value=q.get('last_attempt_date', ''))
+                
+                # Color code mastery level
+                mastery_cell = ws.cell(row=row_idx, column=5)
+                if q['mastery_level'] == 0:
+                    mastery_cell.fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+                    mastery_cell.font = Font(color="FFFFFF", bold=True)
+                elif q['mastery_level'] <= 2:
+                    mastery_cell.fill = PatternFill(start_color="FFA500", end_color="FFA500", fill_type="solid")
+                    mastery_cell.font = Font(bold=True)
+                
+                # Apply borders
+                for col in range(1, 8):
+                    ws.cell(row=row_idx, column=col).border = border
+            
+            # Auto-adjust column widths
+            ws.column_dimensions['A'].width = 6
+            ws.column_dimensions['B'].width = 12
+            ws.column_dimensions['C'].width = 30
+            ws.column_dimensions['D'].width = 30
+            ws.column_dimensions['E'].width = 10
+            ws.column_dimensions['F'].width = 10
+            ws.column_dimensions['G'].width = 20
+            
+            # Save file
+            default_filename = f"smart_review_stats_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".xlsx",
+                filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
+                initialfile=default_filename
+            )
+            
+            if file_path:
+                wb.save(file_path)
+                messagebox.showinfo("Thành công", f"✅ Đã xuất stats:\n{file_path}")
+            
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"❌ Lỗi khi xuất stats:\n{str(e)}")
+    
     def open_settings_dialog(self):
         """Mở dialog cài đặt API keys"""
         from pathlib import Path
@@ -3317,6 +5202,130 @@ class LanguageQuizGUI:
         except:
             pass  # Nếu destroy thất bại thì bỏ qua
 
+
+    def _toggle_practice_pause(self):
+        """Tạm dừng/Tiếp tục Practice Quiz"""
+        if not hasattr(self, 'practice_paused'):
+            self.practice_paused = False
+        
+        self.practice_paused = not self.practice_paused
+        
+        if self.practice_paused:
+            self.practice_pause_btn.config(text="▶️ Tiếp tục", bg="#4caf50")
+            self.practice_timer_label.config(text=f"⏸️ Tạm dừng ({self.practice_timer_seconds}s)", foreground="#ff9800")
+        else:
+            self.practice_pause_btn.config(text="⏸️ Tạm dừng", bg="#ff9800")
+            self.practice_timer_label.config(text=f"⏱️ {self.practice_timer_seconds}s", foreground="#ff5722")
+    
+    def _toggle_voice_pause(self):
+        """Tạm dừng/Tiếp tục Voice Quiz (ở tab Chuẩn bị)"""
+        if not hasattr(self, 'voice_paused'):
+            self.voice_paused = False
+        
+        self.voice_paused = not self.voice_paused
+        
+        if self.voice_paused:
+            self.voice_pause_btn.config(text="▶️ Tiếp tục", bg="#4caf50")
+            messagebox.showinfo("Tạm dừng", "Voice Quiz đã tạm dừng.\n\nBấm 'Tiếp tục' để làm tiếp.")
+        else:
+            self.voice_pause_btn.config(text="⏸️ Tạm dừng", bg="#ff9800")
+            messagebox.showinfo("Tiếp tục", "Voice Quiz đã tiếp tục!")
+    
+    def _toggle_voice_quiz_pause(self):
+        """Tạm dừng/Tiếp tục Voice Quiz (ở tab Voice Quiz)"""
+        if not hasattr(self, 'voice_quiz_paused'):
+            self.voice_quiz_paused = False
+        
+        self.voice_quiz_paused = not self.voice_quiz_paused
+        
+        if self.voice_quiz_paused:
+            self.voice_quiz_pause_btn.config(text="▶️ TIẾP TỤC")
+            messagebox.showinfo("⏸️ Tạm dừng", "Voice Quiz đã tạm dừng.\n\n📌 Nhấn 'Tiếp tục' để làm tiếp.")
+        else:
+            self.voice_quiz_pause_btn.config(text="⏸️ TẠM DỪNG")
+            messagebox.showinfo("▶️ Tiếp tục", "Voice Quiz đã tiếp tục!")
+    
+    def _load_leaderboard(self):
+        """Load top scores to leaderboard"""
+        try:
+            # Query database for top scores from study_log table
+            conn = sqlite3.connect('study_history.db')
+            cursor = conn.cursor()
+            
+            # Check if we have any quiz results saved
+            # Since we don't have a quiz_results table, we'll show a placeholder
+            cursor.execute("""
+                SELECT COUNT(*) FROM sqlite_master 
+                WHERE type='table' AND name='quiz_results'
+            """)
+            
+            table_exists = cursor.fetchone()[0]
+            
+            if not table_exists:
+                # Create the table if it doesn't exist
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS quiz_results (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_name TEXT NOT NULL,
+                        score REAL NOT NULL,
+                        total_questions INTEGER,
+                        date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        language TEXT,
+                        file_name TEXT
+                    )
+                """)
+                conn.commit()
+            
+            # Get top 15 unique users with highest average scores
+            cursor.execute("""
+                SELECT 
+                    user_name,
+                    ROUND(AVG(score), 1) as avg_score,
+                    MAX(score) as best_score,
+                    COUNT(*) as attempts,
+                    MAX(date) as last_date
+                FROM quiz_results
+                WHERE score IS NOT NULL
+                GROUP BY user_name
+                ORDER BY avg_score DESC, best_score DESC
+                LIMIT 15
+            """)
+            
+            results = cursor.fetchall()
+            conn.close()
+            
+            # Clear listbox
+            self.leaderboard_list.delete(0, tk.END)
+            
+            if not results:
+                self.leaderboard_list.insert(tk.END, "  Chưa có dữ liệu điểm số")
+                self.leaderboard_list.insert(tk.END, "")
+                self.leaderboard_list.insert(tk.END, "  💡 Làm bài kiểm tra để ghi điểm!")
+                return
+            
+            # Header
+            self.leaderboard_list.insert(tk.END, "  RANK  TÊN           AVG   BEST  TESTS")
+            self.leaderboard_list.insert(tk.END, "  " + "="*40)
+            
+            # Display rankings with colors
+            for idx, (name, avg, best, attempts, last_date) in enumerate(results, 1):
+                # Truncate long names
+                display_name = name[:12].ljust(12)
+                line = f"  #{idx:<3} {display_name} {avg:>5.1f}  {best:>4.0f}  {attempts:>4}"
+                
+                self.leaderboard_list.insert(tk.END, line)
+                
+                # Color top 3
+                if idx == 1:
+                    self.leaderboard_list.itemconfig(idx+1, bg="#ffd700", fg="#000")  # Gold
+                elif idx == 2:
+                    self.leaderboard_list.itemconfig(idx+1, bg="#c0c0c0", fg="#000")  # Silver
+                elif idx == 3:
+                    self.leaderboard_list.itemconfig(idx+1, bg="#cd7f32", fg="#fff")  # Bronze
+                    
+        except Exception as e:
+            self.leaderboard_list.delete(0, tk.END)
+            self.leaderboard_list.insert(tk.END, f"  ⚠️ Lỗi: {str(e)}")
 
 def main():
     root = tk.Tk()
