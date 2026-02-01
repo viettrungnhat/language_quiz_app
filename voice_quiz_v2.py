@@ -84,10 +84,11 @@ class VoiceManager:
         self.recognizer = sr.Recognizer() if sr else None
         if self.recognizer:
             # ⚠️ QUAN TRỌNG: Cố định energy_threshold (không auto-adjust)
-            # Giảm energy_threshold để nhạy hơn (mặc định 300, tăng = kém nhạy hơn)
-            self.recognizer.energy_threshold = 5  # Rất thấp = cực kỳ nhạy, sẽ nhận từ tiếng lẹo
+            # Giảm energy_threshold để nhạy hơn (mặc định 300, thấp = nhạy hơn)
+            # Giá trị: 2-5 = cực kỳ nhạy (nghe cả tiếng nhỏ), 10-20 = nhạy vừa
+            self.recognizer.energy_threshold = 3  # Giảm từ 5 xuống 3 để nhạy hơn
             self.recognizer.dynamic_energy_threshold = False  # KHÔNG auto-adjust
-            print(f"[OK] STT Energy Threshold: {self.recognizer.energy_threshold} (ultra-sensitive)")
+            print(f"[OK] STT Energy Threshold: {self.recognizer.energy_threshold} (ultra-sensitive - improved recognition)")
 
 
         
@@ -249,7 +250,7 @@ class VoiceManager:
         except Exception as e:
             print(f"Audio file error: {e}")
     
-    def listen_to_microphone(self, timeout: int = 10, language: str = "en-US", quiz_type: str = "meaning") -> Optional[str]:
+    def listen_to_microphone(self, timeout: int = 10, language: str = "en-US", quiz_type: str = "meaning", phrase_time_limit: float = None, countdown_callback=None) -> Optional[str]:
         """
         Lắng nghe từ microphone và chuyển thành text
         Dùng Google Speech Recognition hoặc Whisper
@@ -257,7 +258,9 @@ class VoiceManager:
         Args:
             timeout: Tổng thời gian lắng nghe (giây)
             language: Ngôn ngữ STT
-            quiz_type: Loại quiz ("meaning", "example", "vietnamese") để điều chỉnh thời gian lắng nghe
+            quiz_type: Loại quiz ("meaning", "example", "vietnamese", "pronunciation") để điều chỉnh thời gian lắng nghe
+            phrase_time_limit: Thời gian limit cho một phrase (giây) - nếu None sẽ tính tự động từ quiz_type
+            countdown_callback: Hàm callback để cập nhật countdown timer (nhận remaining_time)
         
         Returns: text hoặc None nếu lỗi
         """
@@ -265,9 +268,15 @@ class VoiceManager:
             print("❌ speech_recognition not installed")
             return None
         
-        # Điều chỉnh phrase_time_limit dựa vào quiz_type
-        # "meaning": 4s (từ đơn, ngắn), "example"/"vietnamese": 12s (câu dài, phù hợp)
-        phrase_time_limit = 4 if quiz_type == "meaning" else 12
+        # Điều chỉnh phrase_time_limit dựa vào quiz_type nếu không được truyền vào
+        if phrase_time_limit is None:
+            if quiz_type == "meaning":
+                phrase_time_limit = 4  # Từ đơn, ngắn
+            elif quiz_type == "pronunciation":
+                phrase_time_limit = 5  # Phát âm, cần thêm thời gian
+            else:  # "example", "vietnamese"
+                phrase_time_limit = 12  # Câu dài
+        
         # Điều chỉnh pause_threshold tùy theo loại quiz
         pause_threshold = 0.5 if quiz_type == "meaning" else 0.6
         
@@ -287,8 +296,39 @@ class VoiceManager:
                 print(f"⚙️ Energy threshold: {self.recognizer.energy_threshold} (fixed)")
                 print(f"⏱️ Thời gian lắng nghe: {phrase_time_limit}s ({quiz_type})")
                 
-                # Ghi âm
-                audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_time_limit)
+                # Ghi âm với countdown timer
+                import threading
+                import time as time_module
+                
+                audio = None
+                listen_done = threading.Event()
+                
+                def listen_thread():
+                    nonlocal audio
+                    try:
+                        audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_time_limit)
+                    finally:
+                        listen_done.set()
+                
+                # Bắt đầu thread lắng nghe
+                thread = threading.Thread(target=listen_thread, daemon=True)
+                thread.start()
+                
+                # Countdown timer
+                if countdown_callback:
+                    start_time = time_module.time()
+                    while not listen_done.is_set():
+                        elapsed = time_module.time() - start_time
+                        remaining = max(0, phrase_time_limit - elapsed)
+                        countdown_callback(remaining)
+                        time_module.sleep(0.1)  # Cập nhật mỗi 0.1s
+                
+                # Chờ thread hoàn thành
+                thread.join(timeout=timeout + 2)
+                
+                if audio is None:
+                    print("❌ Không ghi được âm thanh")
+                    return None
                 
                 # 🔊 Phát beep báo hiệu kết thúc
                 if winsound:
@@ -314,7 +354,6 @@ class VoiceManager:
                 print("❌ Hết thời gian. Hãy nói câu trả lời.")
             else:
                 print(f"❌ Lỗi microphone: {str(e)}")
-            return None
             return None
 
 

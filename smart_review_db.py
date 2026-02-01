@@ -151,20 +151,45 @@ class SmartReviewDB:
         
         self.conn.commit()
     
-    def get_weak_questions(self, file_path: str, user_name: str, 
-                          limit: int = 20) -> List[Dict]:
-        """Lấy các câu hỏi yếu nhất để ôn tập"""
+    def get_weak_questions(self, file_path: str, user_name: str = None, 
+                          limit: int = 20, quiz_type_filter: str = None, 
+                          test_mode: int = None) -> List[Dict]:
+        """Lấy các câu hỏi yếu nhất để ôn tập
+        
+        Args:
+            file_path: Đường dẫn file Excel (bắt buộc)
+            user_name: Tên người dùng (không bắt buộc - để None sẽ lấy tất cả user)
+            limit: Số câu tối đa
+            quiz_type_filter: Lọc theo loại quiz ('voice_quiz', 'meaning', 'example')
+            test_mode: Lọc theo test mode (1 hoặc 2)
+        """
         cursor = self.conn.cursor()
         
-        cursor.execute("""
-            SELECT question_id, question_text, correct_answer, quiz_type,
-                   mastery_level, attempt_count, last_attempt_date
+        # Build query dynamically based on filters
+        query = """
+            SELECT question_id, question_text, correct_answer, quiz_type, test_mode,
+                   mastery_level, attempt_count, last_attempt_date, score
             FROM question_history
-            WHERE file_path=? AND user_name=?
-            AND mastery_level < 3
-            ORDER BY mastery_level ASC, attempt_count DESC, last_attempt_date ASC
-            LIMIT ?
-        """, (file_path, user_name, limit))
+            WHERE file_path=?
+            AND (mastery_level <= 2 OR score < 7)
+        """
+        params = [file_path]
+        
+        # ⚠️ KHÔNG filter theo user_name - lấy tất cả user
+        # Vì "ôn từ yếu" gắn với file/sheet/type/mode, không phụ thuộc user
+        
+        if quiz_type_filter:
+            query += " AND quiz_type=?"
+            params.append(quiz_type_filter)
+        
+        if test_mode is not None:
+            query += " AND test_mode=?"
+            params.append(test_mode)
+        
+        query += " ORDER BY mastery_level ASC, score ASC, last_attempt_date ASC LIMIT ?"
+        params.append(limit)
+        
+        cursor.execute(query, params)
         
         results = []
         for row in cursor.fetchall():
@@ -173,12 +198,74 @@ class SmartReviewDB:
                 'question_text': row['question_text'],
                 'correct_answer': row['correct_answer'],
                 'quiz_type': row['quiz_type'],
+                'test_mode': row['test_mode'],
                 'mastery_level': row['mastery_level'],
                 'attempt_count': row['attempt_count'],
-                'last_attempt_date': row['last_attempt_date']
+                'last_attempt_date': row['last_attempt_date'],
+                'score': row['score']
             })
         
         return results
+    
+    def get_completed_question_ids(self, file_path: str, user_name: str = None, 
+                                   quiz_type_filter: str = None, test_mode: int = None) -> set:
+        """Lấy danh sách ID của tất cả câu hỏi đã làm (bất kể đúng/sai)
+        
+        Args:
+            file_path: Đường dẫn file Excel (bắt buộc)
+            user_name: Tên người dùng (không bắt buộc - để None sẽ lấy tất cả user)
+            quiz_type_filter: Lọc theo loại quiz
+            test_mode: Lọc theo test mode
+            
+        Returns:
+            Set các question_id đã làm
+        """
+        cursor = self.conn.cursor()
+        
+        query = "SELECT DISTINCT question_id FROM question_history WHERE file_path=?"
+        params = [file_path]
+        
+        # ⚠️ KHÔNG filter theo user_name - lấy tất cả user
+        
+        if quiz_type_filter:
+            query += " AND quiz_type=?"
+            params.append(quiz_type_filter)
+        
+        if test_mode is not None:
+            query += " AND test_mode=?"
+            params.append(test_mode)
+        
+        cursor.execute(query, params)
+        
+        return {row['question_id'] for row in cursor.fetchall()}
+    
+    def update_user_name(self, file_path: str, old_user_name: str, 
+                        new_user_name: str, quiz_type_filter: str = None):
+        """Cập nhật tên user trong database (khi user đổi tên ở cuối quiz)
+        
+        Args:
+            file_path: Đường dẫn file Excel
+            old_user_name: Tên cũ
+            new_user_name: Tên mới
+            quiz_type_filter: Lọc theo loại quiz
+        """
+        cursor = self.conn.cursor()
+        
+        if quiz_type_filter:
+            cursor.execute("""
+                UPDATE question_history
+                SET user_name = ?
+                WHERE file_path = ? AND user_name = ? AND quiz_type = ?
+            """, (new_user_name, file_path, old_user_name, quiz_type_filter))
+        else:
+            cursor.execute("""
+                UPDATE question_history
+                SET user_name = ?
+                WHERE file_path = ? AND user_name = ?
+            """, (new_user_name, file_path, old_user_name))
+        
+        self.conn.commit()
+        print(f"🔄 Updated {cursor.rowcount} records: '{old_user_name}' → '{new_user_name}'")
     
     def get_mastery_stats(self, file_path: str, user_name: str) -> Dict:
         """Thống kê mastery level"""

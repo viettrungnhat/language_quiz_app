@@ -222,7 +222,16 @@ class LanguageQuizGUI:
             "end_question": 10,
             "shuffle": True,
             "en_voice": "female",
-            "ja_voice": "female"
+            "ja_voice": "female",
+            # Pronunciation tab defaults
+            "pron_file": "",
+            "pron_sheet": "",
+            "pron_voice": "female",
+            "pron_speed": 1.0,  # Mặc định 1.0x
+            "pron_quiz_type": "meaning",
+            "pron_test_mode": 1,
+            "pron_start": 1,
+            "pron_end": 50
         }
     
     def _save_settings(self):
@@ -778,6 +787,14 @@ class LanguageQuizGUI:
             command=self.voice_stop_quiz, 
             width=20, style='Voice.TButton'
         ).pack(side=tk.LEFT, padx=5, ipady=8)
+        
+        # Status label for pause notification (below buttons)
+        self.voice_status_label = ttk.Label(
+            self.voice_quiz_tab, text="", 
+            font=("Arial", 11, "bold"), 
+            foreground="orange"
+        )
+        self.voice_status_label.pack(pady=5)
     
     def _create_pronunciation_tab(self):
         """🎤 Tab Luyện phát âm - Pronunciation Practice"""
@@ -804,7 +821,8 @@ class LanguageQuizGUI:
         ttk.Label(file_frame, text="Sheet:", font=("Segoe UI", 8)).pack(anchor=tk.W, pady=(3, 0))
         self.pron_sheet_combo = ttk.Combobox(file_frame, state="readonly", width=20, font=("Segoe UI", 8))
         self.pron_sheet_combo.pack(fill=tk.X, pady=2)
-        self.pron_sheet_combo.bind("<<ComboboxSelected>>", lambda e: self._pron_update_questions())
+        # Không force update khi user chỉ chuyển sheet (giữ nguyên phạm vi đã chọn)
+        self.pron_sheet_combo.bind("<<ComboboxSelected>>", lambda e: self._pron_update_questions(force_update=False))
         
         # Pronunciation Settings
         voice_frame = ttk.LabelFrame(left_col, text="🎙️ Cài đặt Giọng", padding=5)
@@ -864,9 +882,9 @@ class LanguageQuizGUI:
         self.pron_end_var = tk.IntVar(value=self.user_settings.get("pron_end", 50))
         ttk.Spinbox(range_row2, from_=1, to=1000, textvariable=self.pron_end_var, width=5).pack(side=tk.LEFT, padx=5)
         
-        # Add trace to save when range changes
-        self.pron_start_var.trace_add("write", lambda *args: self._pron_save_settings())
-        self.pron_end_var.trace_add("write", lambda *args: self._pron_save_settings())
+        # Add trace to save when range changes (with delay to avoid too many saves while typing)
+        self.pron_start_var.trace_add("write", lambda *args: self.root.after(1000, self._pron_save_settings))
+        self.pron_end_var.trace_add("write", lambda *args: self.root.after(1000, self._pron_save_settings))
         
         # Start button
         ttk.Button(
@@ -954,7 +972,8 @@ class LanguageQuizGUI:
                     elif sheets:
                         self.pron_sheet_combo.current(0)
                     
-                    self._pron_update_questions()
+                    # Không force update khi load lại session (giữ nguyên phạm vi đã lưu)
+                    self._pron_update_questions(force_update=False)
                 except:
                     pass
         except Exception as e:
@@ -1503,9 +1522,40 @@ class LanguageQuizGUI:
         compact_row.pack(fill=tk.X, pady=3)
         
         ttk.Label(compact_row, text="File:", font=("Segoe UI", 9, "bold")).pack(side=tk.LEFT)
-        self.practice_file_label = ttk.Label(compact_row, text="Chưa chọn", 
-                                             foreground="#2196f3", font=("Segoe UI", 9))
-        self.practice_file_label.pack(side=tk.LEFT, padx=(3,10))
+        
+        # Load saved file nếu có
+        saved_practice_file = self.user_settings.get("practice_file", "")
+        if saved_practice_file and Path(saved_practice_file).exists():
+            display_name = Path(saved_practice_file).name
+            display_color = "green"
+            self.practice_selected_file = saved_practice_file
+        else:
+            display_name = "Chưa chọn"
+            display_color = "#2196f3"
+        
+        self.practice_file_label = ttk.Label(compact_row, text=display_name, 
+                                             foreground=display_color, font=("Segoe UI", 9))
+        self.practice_file_label.pack(side=tk.LEFT, padx=(3,5))
+        
+        ttk.Label(compact_row, text="Sheet:", font=("Segoe UI", 9, "bold")).pack(side=tk.LEFT)
+        self.practice_sheet_combo = ttk.Combobox(compact_row, width=12, state="readonly")
+        self.practice_sheet_combo.pack(side=tk.LEFT, padx=(3,10))
+        
+        # Load sheets nếu có file đã lưu
+        if saved_practice_file and Path(saved_practice_file).exists():
+            try:
+                import openpyxl
+                wb = openpyxl.load_workbook(saved_practice_file, data_only=True)
+                self.practice_sheet_combo['values'] = wb.sheetnames
+                # Load sheet đã lưu
+                saved_sheet = self.user_settings.get("practice_sheet", "")
+                if saved_sheet in wb.sheetnames:
+                    self.practice_sheet_combo.set(saved_sheet)
+                elif wb.sheetnames:
+                    self.practice_sheet_combo.current(0)
+            except Exception as e:
+                print(f"⚠️ Lỗi load sheets cho practice: {e}")
+        
         ttk.Button(compact_row, text="📂 Chọn File", command=self._practice_select_file, 
                   width=10).pack(side=tk.RIGHT, padx=2)
         ttk.Button(compact_row, text="▶️ Bắt Đầu Practice", command=self._start_practice_quiz, 
@@ -1709,13 +1759,34 @@ class LanguageQuizGUI:
         if saved_file and Path(saved_file).exists():
             display_name = Path(saved_file).name
             display_color = "green"
+            self.flashcard_file = saved_file  # Lưu vào biến
         else:
             display_name = "Chưa chọn"
             display_color = "#2196f3"
         
         self.flashcard_file_label = ttk.Label(settings_row, text=display_name, 
                                                foreground=display_color, font=("Segoe UI", 9))
-        self.flashcard_file_label.pack(side=tk.LEFT, padx=(3, 10))
+        self.flashcard_file_label.pack(side=tk.LEFT, padx=(3, 5))
+        
+        ttk.Label(settings_row, text="Sheet:", font=("Segoe UI", 9, "bold")).pack(side=tk.LEFT)
+        self.flashcard_sheet_combo = ttk.Combobox(settings_row, width=12, state="readonly")
+        self.flashcard_sheet_combo.pack(side=tk.LEFT, padx=(3, 10))
+        
+        # Load sheets nếu có file đã lưu
+        if saved_file and Path(saved_file).exists():
+            try:
+                import openpyxl
+                wb = openpyxl.load_workbook(saved_file, data_only=True)
+                self.flashcard_sheet_combo['values'] = wb.sheetnames
+                # Load sheet đã lưu
+                saved_sheet = self.user_settings.get("flashcard_sheet", "")
+                if saved_sheet in wb.sheetnames:
+                    self.flashcard_sheet_combo.set(saved_sheet)
+                elif wb.sheetnames:
+                    self.flashcard_sheet_combo.current(0)
+            except Exception as e:
+                print(f"⚠️ Lỗi load sheets cho flashcard: {e}")
+        
         ttk.Button(settings_row, text="📂 Chọn File", 
                   command=self._flashcard_select_file, width=10).pack(side=tk.LEFT, padx=3)
         
@@ -1860,6 +1931,7 @@ class LanguageQuizGUI:
     def _flashcard_select_file(self):
         """Chọn file Excel cho Flashcard"""
         from tkinter import filedialog
+        import openpyxl
         file_path = filedialog.askopenfilename(
             title="Chọn file Excel",
             filetypes=[("Excel files", "*.xlsx *.xls")],
@@ -1868,6 +1940,22 @@ class LanguageQuizGUI:
         if file_path:
             self.flashcard_file = file_path
             self.flashcard_file_label.config(text=Path(file_path).name, foreground="green")
+            
+            # Load sheet names
+            try:
+                wb = openpyxl.load_workbook(file_path, data_only=True)
+                sheet_names = wb.sheetnames
+                self.flashcard_sheet_combo['values'] = sheet_names
+                if sheet_names:
+                    # Kiểm tra có sheet đã lưu không
+                    saved_sheet = self.user_settings.get("flashcard_sheet", "")
+                    if saved_sheet in sheet_names:
+                        self.flashcard_sheet_combo.set(saved_sheet)
+                    else:
+                        self.flashcard_sheet_combo.current(0)
+            except Exception as e:
+                print(f"⚠️ Lỗi load sheets: {e}")
+            
             # Lưu vào settings
             self.user_settings["flashcard_file"] = file_path
             self._save_settings()
@@ -1878,11 +1966,21 @@ class LanguageQuizGUI:
             messagebox.showwarning("Cảnh báo", "⚠️ Vui lòng chọn file Excel trước!")
             return
         
+        # Kiểm tra sheet đã chọn
+        sheet_name = self.flashcard_sheet_combo.get() if hasattr(self, 'flashcard_sheet_combo') else None
+        if not sheet_name:
+            messagebox.showwarning("Cảnh báo", "⚠️ Vui lòng chọn sheet!")
+            return
+        
+        # Lưu sheet đã chọn
+        self.user_settings["flashcard_sheet"] = sheet_name
+        self._save_settings()
+        
         try:
             # Load data from Excel
             from openpyxl import load_workbook
             wb = load_workbook(self.flashcard_file, data_only=True)
-            ws = wb.active
+            ws = wb[sheet_name]  # Dùng sheet đã chọn thay vì ws.active
             
             # Đọc header để xác định cấu trúc cột
             header_row = [str(cell.value).lower() if cell.value else "" for cell in ws[1]]
@@ -1913,10 +2011,11 @@ class LanguageQuizGUI:
             end_row = self.flashcard_end_var.get() + 1
             
             self.flashcard_data = []
-            for row in ws.iter_rows(min_row=start_row, max_row=end_row, values_only=True):
+            for idx, row in enumerate(ws.iter_rows(min_row=start_row, max_row=end_row, values_only=True), start=start_row):
                 word_val = row[word_col] if len(row) > word_col else None
                 if word_val:  # Has word
                     self.flashcard_data.append({
+                        "excel_row": idx - 1,  # Số thứ tự thực tế trong Excel (trừ header)
                         "word": str(word_val) if word_val else "",
                         "meaning": str(row[meaning_col]) if len(row) > meaning_col and row[meaning_col] else "",
                         "example_en": str(row[example_en_col]) if len(row) > example_en_col and row[example_en_col] else "",
@@ -1954,10 +2053,11 @@ class LanguageQuizGUI:
         
         card = self.flashcard_data[self.flashcard_current_idx]
         
-        # Update progress
+        # Update progress với số thứ tự thực tế từ Excel
         current = self.flashcard_current_idx + 1
         total = len(self.flashcard_data)
-        self.flashcard_progress_label.config(text=f"Thẻ {current}/{total}")
+        excel_row = card.get('excel_row', current)
+        self.flashcard_progress_label.config(text=f"Thẻ {current}/{total} (#{excel_row})")
         self.flashcard_progress_bar['value'] = (current / total) * 100
         
         # Update stats
@@ -2564,7 +2664,8 @@ class LanguageQuizGUI:
                 weak_questions = self.smart_review_db.get_weak_questions(
                     file_path=str(self.selected_file),
                     user_name=user_name,
-                    limit=20  # Lấy tối đa 20 câu yếu
+                    limit=20,  # Lấy tối đa 20 câu yếu
+                    quiz_type_filter=self.quiz_type_str  # CHỈ lấy từ yếu của loại quiz đang chọn (meaning/example)
                 )
                 
                 if not weak_questions:
@@ -2737,6 +2838,88 @@ class LanguageQuizGUI:
     
     # ===== VOICE QUIZ =====
     
+    def _ask_user_name_before_quiz(self):
+        """📝 Dialog nhập tên user TRƯỚC khi bắt đầu quiz"""
+        print("🔵 DEBUG: _ask_user_name_before_quiz() called")  # DEBUG
+        # 👤 Tạo custom dialog
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Voice Quiz - Xác Nhận Tên")
+        dialog.geometry("350x150")
+        dialog.resizable(False, False)
+        dialog.attributes('-topmost', True)  # Always on top
+        
+        # 🎨 Set icon cho dialog
+        try:
+            if self.icon_path.exists():
+                dialog.iconbitmap(str(self.icon_path))
+        except:
+            pass
+        
+        # Center dialog - calculate position
+        dialog.update_idletasks()
+        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - 175
+        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - 75
+        dialog.geometry(f"350x150+{max(0, x)}+{max(0, y)}")
+        
+        # Make modal
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # Frame chính
+        frame = ttk.Frame(dialog, padding=20)
+        frame.pack(fill=tk.BOTH, expand=True)
+        
+        ttk.Label(frame, text="👤 Tên của bạn:", font=("Arial", 10)).pack(anchor=tk.W, pady=(0, 5))
+        
+        entry = ttk.Entry(frame, width=30, font=("Arial", 10))
+        
+        # ✅ Dùng tên từ cài đặt hoặc mặc định
+        if hasattr(self, 'user_name_entry'):
+            default_name = self.user_name_entry.get().strip() or "Default"
+        else:
+            default_name = "Default"
+        
+        entry.insert(0, default_name)
+        entry.pack(fill=tk.X, pady=(0, 15))
+        entry.focus()
+        entry.select_range(0, tk.END)  # Select all text for easy editing
+        
+        result = [None]  # Để lưu kết quả từ dialog
+        
+        def on_ok():
+            user_name = entry.get().strip()
+            if not user_name:
+                messagebox.showwarning("Cảnh báo", "⚠️ Vui lòng nhập tên!")
+                return
+            result[0] = user_name
+            dialog.destroy()
+        
+        def on_cancel():
+            result[0] = None
+            dialog.destroy()
+        
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack(fill=tk.X, pady=(10, 0))
+        ttk.Button(btn_frame, text="Bắt Đầu", command=on_ok, width=12).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Hủy", command=on_cancel, width=12).pack(side=tk.LEFT, padx=5)
+        
+        # Bind Enter key to OK
+        entry.bind('<Return>', lambda e: on_ok())
+        dialog.bind('<Escape>', lambda e: on_cancel())
+        
+        print(f"🔵 DEBUG: Dialog created at ({x}, {y}), waiting for input...")  # DEBUG
+        self.root.wait_window(dialog)
+        print(f"🔵 DEBUG: Dialog closed, result[0] = {result[0]}")  # DEBUG
+        
+        # ✅ Lưu tên vào instance variable để dùng trong quiz
+        if result[0]:
+            self.current_quiz_user = result[0]
+            print(f"👤 Bắt đầu Voice Quiz với tên: {self.current_quiz_user}")
+        else:
+            print("❌ User hủy Voice Quiz")
+        
+        return result[0]
+    
     def start_voice_quiz(self):
         """Bắt đầu Voice Quiz"""
         # 🛑 STOP quiz cũ nếu đang chạy
@@ -2753,6 +2936,11 @@ class LanguageQuizGUI:
         
         if not self.selected_file:
             messagebox.showerror("Lỗi", "❌ Vui lòng chọn file Excel!")
+            return
+        
+        # 👤 Nhập tên user TRƯỚC KHI bắt đầu quiz
+        user_name = self._ask_user_name_before_quiz()
+        if not user_name:  # User bấm Cancel/Hủy
             return
         
         # Mark quiz is running
@@ -2787,78 +2975,92 @@ class LanguageQuizGUI:
                 
                 # 🔍 Get weak questions from Smart Review DB - FILTERED BY FILE
                 file_path = str(self.selected_file)
+                # Chuẩn hóa file path giống như khi lưu
+                normalized_file_path = str(Path(file_path).resolve()).lower().replace('\\', '/')
                 sheet_name = self.sheet_combo.get()
-                user_name = "Default"  # Or get from settings
                 
-                # Use Smart Review DB to get weak questions for THIS specific file
-                weak_questions = []
+                # 📊 Lấy tất cả câu hỏi từ Excel
+                total_questions = len(self.data)
+                
+                # 🎯 Lấy quiz_type và test_mode hiện tại để filter chính xác
+                current_quiz_type = self.quiz_type_var.get()  # "meaning" hoặc "example"
+                current_test_mode = self.test_mode  # 1 hoặc 2
+                
+                # 🔍 Lấy câu đã làm SAI từ Smart Review DB
+                # ⚠️ KHÔNG filter theo user - chỉ filter theo file/sheet/type/mode
+                weak_done_questions = []
                 if self.smart_review_db:
-                    weak_questions = self.smart_review_db.get_weak_questions(
-                        file_path=file_path,
-                        user_name=user_name,
-                        limit=100  # Get up to 100 weak questions
+                    weak_done_questions = self.smart_review_db.get_weak_questions(
+                        file_path=normalized_file_path,
+                        user_name=None,  # ← KHÔNG quan tâm user!
+                        limit=1000,
+                        quiz_type_filter='voice_quiz',
+                        test_mode=current_test_mode  # Filter theo mode 1 hoặc 2
                     )
-                    print(f"📚 File: {Path(file_path).name} | Sheet: {sheet_name}")
-                    print(f"🔍 Tìm thấy {len(weak_questions)} câu yếu từ Smart Review DB")
                 
-                # Fallback to old method if Smart Review has no data
-                if not weak_questions:
-                    all_weak_words = []
-                    for lang in ["English", "Japanese", "Chinese", "Vietnamese"]:
-                        ww = self.study_db.get_weak_words(lang)
-                        all_weak_words.extend(ww)
-                    weak_word_texts = {w["word"].strip().lower() for w in all_weak_words}
-                else:
-                    # Use question IDs from Smart Review
-                    weak_question_ids = {q['question_id'] for q in weak_questions}
-                    weak_word_texts = {q['question_text'].strip().lower() for q in weak_questions}
+                # 📚 Lấy tất cả câu đã làm (bất kể đúng/sai) từ database
+                done_question_ids = set()
+                if self.smart_review_db:
+                    done_question_ids = self.smart_review_db.get_completed_question_ids(
+                        file_path=normalized_file_path,
+                        user_name=None,  # ← KHÔNG quan tâm user!
+                        quiz_type_filter='voice_quiz',
+                        test_mode=current_test_mode
+                    )
                 
-                if not weak_word_texts and not weak_questions:
-                    messagebox.showinfo("Thông báo", 
-                        f"✅ Tuyệt vời!\n\n"
-                        f"Không có từ/câu nào cần ôn tập cho file này.\n\n"
-                        f"📁 File: {Path(file_path).name}\n"
-                        f"📑 Sheet: {sheet_name}\n\n"
-                        f"💡 Mẹo: Hãy thử chế độ Normal để học từ mới.")
-                    return
+                # ⚡ Logic mới: Câu yếu = Câu làm SAI + Câu CHƯA LÀM
+                weak_question_ids = {q['question_id'] for q in weak_done_questions}
                 
-                # 🔗 Match weak words with Excel data to get full info
+                # Duyệt qua tất cả câu trong Excel để tìm câu chưa làm
                 selected_data = []
-                seen_words = set()  # Tránh trùng lặp
+                seen_words = set()
                 
                 for excel_row in self.data:
-                    word_in_excel = excel_row.get("word", "").strip().lower()
                     excel_row_num = excel_row.get("excel_row", 0)
+                    word_in_excel = excel_row.get("word", "").strip().lower()
                     
                     # Skip nếu đã có word này (tránh trùng lặp)
                     if word_in_excel in seen_words:
                         continue
                     
-                    # Skip nếu không có nội dung câu hỏi (meaning hoặc sentence rỗng)
+                    # Skip nếu không có nội dung câu hỏi
                     meaning = excel_row.get("meaning", "").strip()
-                    sentence_vn = excel_row.get("sentence_vn", "").strip()
-                    if not meaning and not sentence_vn:
-                        print(f"⚠️ Skip empty: #{excel_row_num} '{excel_row.get('word')}'")
+                    if not meaning:
                         continue
                     
-                    # Match by question_id OR by word text
-                    if (weak_questions and excel_row_num in {q['question_id'] for q in weak_questions}) or \
-                       (word_in_excel in weak_word_texts):
+                    # ✅ Thêm vào weak list nếu:
+                    # 1. Đã làm và SAI (trong weak_question_ids)
+                    # 2. CHƯA LÀM (không có trong done_question_ids)
+                    is_weak_done = excel_row_num in weak_question_ids
+                    is_not_done = excel_row_num not in done_question_ids
+                    
+                    if is_weak_done or is_not_done:
                         selected_data.append(excel_row)
                         seen_words.add(word_in_excel)
-                        print(f"✅ Matched weak: #{excel_row_num} '{excel_row.get('word')}'")
+                        status = "❌ Đã làm SAI" if is_weak_done else "❓ Chưa làm"
+                        print(f"{status}: #{excel_row_num} '{excel_row.get('word')}'")
+                
+                # 📊 Thống kê
+                num_weak_done = len(weak_question_ids)
+                num_not_done = len([q for q in self.data if q.get("excel_row") not in done_question_ids])
+                num_total_weak = len(selected_data)
+                
+                print(f"📚 File: {Path(file_path).name} | Sheet: {sheet_name}")
+                print(f"📁 Normalized path: {normalized_file_path}")
+                print(f"📊 Tổng câu: {total_questions}")
+                print(f"✅ Đã làm đúng: {len(done_question_ids) - num_weak_done}")
+                print(f"❌ Đã làm sai: {num_weak_done}")
+                print(f"❓ Chưa làm: {num_not_done}")
+                print(f"🔍 Tổng câu yếu (sai + chưa làm): {num_total_weak}")
                 
                 if not selected_data:
-                    messagebox.showwarning(
-                        "Practice Mode",
-                        f"⚠️ Tìm thấy {len(weak_questions) or len(weak_word_texts)} từ yếu trong database\n"
-                        f"Nhưng không có từ nào khớp với file Excel hiện tại!\n\n"
+                    messagebox.showinfo("Thông báo", 
+                        f"✅ Tuyệt vời!\n\n"
+                        f"Không có từ/câu nào cần ôn tập cho file này.\n"
+                        f"Tất cả {total_questions} câu đã làm ĐÚNG!\n\n"
                         f"📁 File: {Path(file_path).name}\n"
                         f"📑 Sheet: {sheet_name}\n\n"
-                        f"💡 Giải pháp:\n"
-                        f"• Chọn đúng file Excel mà bạn đã học trước đó\n"
-                        f"• Hoặc làm Normal Quiz với file này để tạo dữ liệu mới"
-                    )
+                        f"💡 Mẹo: Hãy thử file/sheet khác để học từ mới.")
                     return
                 
                 num_questions = len(selected_data)
@@ -2871,16 +3073,28 @@ class LanguageQuizGUI:
                 
                 stats_text = ", ".join([f"{lang}: {count}" for lang, count in lang_stats.items()])
                 
-                messagebox.showinfo("Chế độ Ôn tập", 
-                    f"🎯 CHẾ ĐỘ PRACTICE - ÔN TẬP TỪ YẾU\n\n"
-                    f"📁 File: {Path(file_path).name}\n"
-                    f"📑 Sheet: {sheet_name}\n\n"
-                    f"📚 Tổng số từ/câu yếu: {num_questions}\n\n"
-                    f"🌐 Phân bố:\n{stats_text}\n\n"
-                    f"💡 Hãy cố gắng trả lời đúng để cải thiện!\n\n"
-                    f"👉 Nhấn OK để bắt đầu Voice Quiz ôn tập!")
+                # Xác định tên mode để hiển thị
+                mode_text = "Mode 1 (VN→Foreign)" if current_test_mode == 1 else "Mode 2 (Foreign→VN)"
+                type_text = "Từ vựng" if current_quiz_type == "meaning" else "Câu ví dụ"
                 
-                mode_text = f"🎯 Ôn tập từ yếu: {num_questions} từ cần học lại"
+                messagebox.showinfo("Chế độ Ôn tập", 
+                    f"🎤 VOICE QUIZ - ÔN TẬP TỪ YẾU\n\n"
+                    f"📁 File: {Path(file_path).name}\n"
+                    f"📑 Sheet: {sheet_name}\n"
+                    f"📝 Loại: {type_text}\n"
+                    f"🔄 {mode_text}\n\n"
+                    f"📊 Thống kê:\n"
+                    f"   ✅ Đã làm đúng: {len(done_question_ids) - num_weak_done} câu\n"
+                    f"   ❌ Đã làm sai: {num_weak_done} câu\n"
+                    f"   ❓ Chưa làm: {num_not_done} câu\n\n"
+                    f"🔄 Cần ôn tập: {num_questions} câu\n"
+                    f"   (= {num_weak_done} sai + {num_not_done} chưa làm)\n\n"
+                    f"🌐 Phân bố:\n{stats_text}\n\n"
+                    f"💡 Dữ liệu từ TẤT CẢ người dùng!\n"
+                    f"   (Gắn với: File + Sheet + Loại + Mode)\n\n"
+                    f"👉 Nhấn OK để bắt đầu!")
+                
+                mode_text = f"🎯 Ôn tập: {num_weak_done} câu sai + {num_not_done} câu chưa làm"
                 
             except Exception as e:
                 messagebox.showerror("Lỗi", f"❌ Lỗi khi tải từ yếu:\n{e}")
@@ -2928,8 +3142,19 @@ class LanguageQuizGUI:
         
         self.quiz_engine.quiz_type = self.quiz_type_str
         
+        # 🎯 Lấy tên user TRƯỚC KHI BẮT ĐẦU quiz để dùng xuyên suốt
+        # Nếu user_name_entry không tồn tại, dùng default
+        if hasattr(self, 'user_name_entry'):
+            current_user_name = self.user_name_entry.get().strip() or "Default"
+        else:
+            current_user_name = "Default"
+        
+        self.current_quiz_user = current_user_name  # Lưu để dùng trong quiz
+        
         self.current_question_idx = 0
         self.quiz_results = []
+        # ✅ Khởi tạo quiz_results với user_name ngay từ đầu
+        self.quiz_results.append({"user_name": current_user_name})
         self.instruction_shown = False  # Reset instruction cho quiz mới
         self.quiz_mode = quiz_mode  # Store mode for use in quiz
         
@@ -2939,6 +3164,13 @@ class LanguageQuizGUI:
         
         # Reset event cho quiz mới
         self.voice_quiz_stop_event.clear()
+        
+        # Reset pause state
+        self.voice_quiz_paused = False
+        if hasattr(self, 'voice_quiz_pause_btn'):
+            self.voice_quiz_pause_btn.config(text="⏸️ TẠM DỪNG")
+        if hasattr(self, 'voice_status_label'):
+            self.voice_status_label.config(text="", foreground='black')
         
         # ✅ Đánh dấu quiz mới đang chạy
         self.voice_quiz_running = True
@@ -3346,12 +3578,22 @@ class LanguageQuizGUI:
                 
                 # Lưu kết quả với điểm 0 (correct_answer đã được xác định ở trên)
                 question_num = question.get("excel_row", self.current_question_idx + 1)
+                
+                # Get proper question text based on quiz type
+                if self.quiz_type_str == "meaning":
+                    question_display = question.get("word", "")
+                elif self.quiz_type_str == "example":
+                    question_display = question.get("example_en", question.get("example_zh", ""))
+                else:
+                    question_display = question.get("example_vi", "")
+                
                 self.quiz_results.append({
                     "question_num": question_num,
-                    "question": question.get("word"),
+                    "question": question_display,
                     "user_answer": "(Không trả lời)",
                     "correct_answer": correct_answer,
                     "score": 0,  # ❌ 0 điểm
+                    "is_correct": False,
                     "attempt": 1,
                     "test_mode": self.test_mode,  # 📝 Thêm test_mode
                     "quiz_type": self.quiz_type_str  # 📝 Thêm quiz_type
@@ -3360,11 +3602,22 @@ class LanguageQuizGUI:
                 # � Save to Smart Review DB
                 if self.smart_review_db and hasattr(self, 'selected_file'):
                     try:
-                        user_name = self.quiz_results[0].get("user_name", "Unknown") if self.quiz_results else "Unknown"
+                        user_name = getattr(self, 'current_quiz_user', 'Unknown')
+                        # Get proper question text based on quiz type
+                        if self.quiz_type_str == "meaning":
+                            question_text = question.get("word", "")
+                        elif self.quiz_type_str == "example":
+                            question_text = question.get("example_en", question.get("example_zh", ""))
+                        else:
+                            question_text = question.get("example_vi", "")
+                        
+                        # Normalize file path
+                        normalized_file_path = str(Path(self.selected_file).resolve()).lower().replace('\\', '/')
+                        
                         self.smart_review_db.save_question_result(
-                            file_path=str(self.selected_file),
+                            file_path=normalized_file_path,
                             question_id=question_num,
-                            question_text=question.get("word", ""),
+                            question_text=question_text,
                             correct_answer=correct_answer,
                             user_name=user_name,
                             quiz_type=self.quiz_type_str,
@@ -3397,12 +3650,22 @@ class LanguageQuizGUI:
             # Lưu kết quả
             score = min(10, int(similarity * 10)) if is_correct else max(0, int(similarity * 5))
             question_num = question.get("excel_row", self.current_question_idx + 1)  # Số thứ tự từ Excel
+            
+            # Get proper question text based on quiz type
+            if self.quiz_type_str == "meaning":
+                question_display = question.get("word", "")
+            elif self.quiz_type_str == "example":
+                question_display = question.get("example_en", question.get("example_zh", ""))
+            else:
+                question_display = question.get("example_vi", "")
+            
             self.quiz_results.append({
                 "question_num": question_num,  # ✨ Số thứ tự từ Excel
-                "question": question.get("word"),
+                "question": question_display,
                 "user_answer": user_answer,
                 "correct_answer": correct_answer,
                 "score": score,
+                "is_correct": is_correct,
                 "attempt": 1,
                 "test_mode": self.test_mode,  # 📝 Thêm test_mode để hiển thị câu hỏi đầy đủ
                 "quiz_type": self.quiz_type_str  # 📝 Thêm quiz_type
@@ -3411,11 +3674,22 @@ class LanguageQuizGUI:
             # 📚 Save to Smart Review DB
             if self.smart_review_db and hasattr(self, 'selected_file'):
                 try:
-                    user_name = self.quiz_results[0].get("user_name", "Unknown") if self.quiz_results else "Unknown"
+                    user_name = getattr(self, 'current_quiz_user', 'Unknown')
+                    # Get proper question text based on quiz type
+                    if self.quiz_type_str == "meaning":
+                        question_text = question.get("word", "")
+                    elif self.quiz_type_str == "example":
+                        question_text = question.get("example_en", question.get("example_zh", ""))
+                    else:
+                        question_text = question.get("example_vi", "")
+                    
+                    # Normalize file path
+                    normalized_file_path = str(Path(self.selected_file).resolve()).lower().replace('\\', '/')
+                    
                     self.smart_review_db.save_question_result(
-                        file_path=str(self.selected_file),
+                        file_path=normalized_file_path,
                         question_id=question_num,
-                        question_text=question.get("word", ""),
+                        question_text=question_text,
                         correct_answer=correct_answer,
                         user_name=user_name,
                         quiz_type=self.quiz_type_str,
@@ -4159,11 +4433,18 @@ class LanguageQuizGUI:
         ttk.Label(frame, text="👤 Nhập tên của bạn:", font=("Arial", 10)).pack(anchor=tk.W, pady=(0, 5))
         
         entry = ttk.Entry(frame, width=30, font=("Arial", 10))
-        entry.insert(0, "Test Phuong Anh")  # ✨ Default name
+        # ✅ Dùng tên đã nhập ở tab Chuẩn bị, cho phép user sửa
+        if hasattr(self, 'current_quiz_user'):
+            default_name = self.current_quiz_user
+        elif hasattr(self, 'user_name_entry'):
+            default_name = self.user_name_entry.get().strip() or "Default"
+        else:
+            default_name = "Default"
+        
+        entry.insert(0, default_name)
         entry.pack(fill=tk.X, pady=(0, 15))
         entry.focus()
         entry.select_range(0, tk.END)  # Select all text for easy editing
-        
         user_name = [None]  # Để lưu kết quả từ dialog
         
         def on_ok():
@@ -4183,6 +4464,7 @@ class LanguageQuizGUI:
         
         self.root.wait_window(dialog)
         
+        print(f"🔍 DEBUG Voice Quiz: user_name = {user_name[0] if user_name else 'None'}")
         # Nếu user nhập tên thì lưu tự động
         if user_name[0]:
             # � Tính điểm trung bình
@@ -4287,18 +4569,71 @@ class LanguageQuizGUI:
             # �🕐 Thêm timestamp
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
+            # ⚡ Nếu user thay đổi tên, cần update lại database cho các câu đã lưu realtime
+            old_user_name = getattr(self, 'current_quiz_user', 'Unknown')
+            new_user_name = user_name[0]
+            
+            if old_user_name != new_user_name and self.smart_review_db:
+                print(f"🔄 User đổi tên: '{old_user_name}' → '{new_user_name}'")
+                try:
+                    normalized_file_path = str(Path(self.selected_file).resolve()).lower().replace('\\', '/')
+                    self.smart_review_db.update_user_name(
+                        file_path=normalized_file_path,
+                        old_user_name=old_user_name,
+                        new_user_name=new_user_name,
+                        quiz_type_filter='voice_quiz'
+                    )
+                    print(f"✅ Đã cập nhật tên user trong database")
+                except Exception as e:
+                    print(f"⚠️ Lỗi khi update user name: {e}")
+            
             # Thêm tên và thời gian vào mỗi kết quả
             for result in self.quiz_results:
-                result["user_name"] = user_name[0]
+                result["user_name"] = new_user_name
                 result["timestamp"] = timestamp
             
             # 💾 Tự động lưu file JSON
-            self._auto_save_results(user_name[0], timestamp)
+            self._auto_save_results(new_user_name, timestamp)
             
-            # 📤 Gửi kết quả lên Discord
-            self._send_to_discord(user_name[0], timestamp)
+            # � Lưu kết quả vào Smart Review Database
+            if self.smart_review_db and hasattr(self, 'selected_file'):
+                try:
+                    # Chuẩn hóa file path (lowercase + forward slash)
+                    normalized_file_path = str(Path(self.selected_file).resolve()).lower().replace('\\', '/')
+                    print(f"🔍 DEBUG Voice Quiz Save:")
+                    print(f"   📁 File: {normalized_file_path}")
+                    print(f"   👤 User: {new_user_name}")
+                    for result in self.quiz_results:
+                        # Xác định question_id dựa trên excel_row hoặc position
+                        question_id = result.get("excel_row", result.get("question_num", 0))
+                        question_text = result.get("question", result.get("word", ""))
+                        user_answer = result.get("user_answer", "")
+                        is_correct = result.get("is_correct", False)
+                        score = result.get("score", 0)
+                        
+                        print(f"   💾 Q{question_id}: '{question_text}' | ✓={is_correct} | Score={score}")
+                        
+                        # Lưu vào database
+                        self.smart_review_db.save_question_result(
+                            file_path=normalized_file_path,
+                            question_id=question_id,
+                            question_text=question_text,
+                            correct_answer=question_text,  # Đáp án đúng là chính từ đó
+                            user_name=new_user_name,
+                            quiz_type="voice_quiz",
+                            test_mode=self.test_mode,
+                            is_correct=is_correct,
+                            user_answer=user_answer,
+                            score=score
+                        )
+                    print(f"✅ Đã lưu {len(self.quiz_results)} kết quả vào Smart Review DB")
+                except Exception as e:
+                    print(f"⚠️ Lỗi khi lưu vào Smart Review DB: {e}")
             
-            print(f"✅ Lưu kết quả với tên: {user_name[0]}, Thời gian: {timestamp}")
+            # �📤 Gửi kết quả lên Discord
+            self._send_to_discord(new_user_name, timestamp)
+            
+            print(f"✅ Lưu kết quả với tên: {new_user_name}, Thời gian: {timestamp}")
         
         self.show_results()
         self.notebook.select(self.results_tab)
@@ -4404,11 +4739,11 @@ class LanguageQuizGUI:
                 else:
                     full_question = f"Dịch '{word}' sang tiếng Việt"
             
-            report += f"\n{emoji} {question_num}. (Lần {result['attempt']})\n"
+            report += f"\n{emoji} {question_num}. (Lần {result.get('attempt', 1)})\n"
             report += f"   ❓ Câu hỏi: {full_question}\n"
-            report += f"   🎤 Bạn trả lời: {result['user_answer']}\n"
-            report += f"   ✨ Đáp án đúng: {result['correct_answer']}\n"
-            report += f"   📊 Điểm: {result['score']}/10\n"
+            report += f"   🎤 Bạn trả lời: {result.get('user_answer', '(Không có câu trả lời)')}\n"
+            report += f"   ✨ Đáp án đúng: {result.get('correct_answer', '?')}\n"
+            report += f"   📊 Điểm: {result.get('score', 0)}/10\n"
         
         self.results_text.config(state=tk.NORMAL)
         self.results_text.delete(1.0, tk.END)
@@ -4791,7 +5126,7 @@ class LanguageQuizGUI:
 """
         for result in loaded_results:
             question_num = result.get('question_num', '?')  # Lấy số thứ tự từ Excel
-            report += f"\n{question_num}. {result['question']} (Lần {result['attempt']})\n"
+            report += f"\n{question_num}. {result.get('question', '?')} (Lần {result.get('attempt', 1)})\n"
             report += f"   Bạn trả lời: {result['user_answer']}\n"
             report += f"   Đáp án: {result['correct_answer']}\n"
             report += f"   Điểm: {result['score']}/10\n"
@@ -5038,6 +5373,7 @@ class LanguageQuizGUI:
     def _practice_select_file(self):
         """Chọn file cho Practice Quiz"""
         from tkinter import filedialog
+        import openpyxl
         file_path = filedialog.askopenfilename(
             title="Chọn File Excel",
             filetypes=[("Excel files", "*.xlsx *.xls"), ("All files", "*.*")]
@@ -5048,6 +5384,22 @@ class LanguageQuizGUI:
                 text=file_path.split("/")[-1].split("\\")[-1],  # Get filename only
                 foreground="green"
             )
+            
+            # Load sheet names
+            try:
+                wb = openpyxl.load_workbook(file_path, data_only=True)
+                sheet_names = wb.sheetnames
+                self.practice_sheet_combo['values'] = sheet_names
+                if sheet_names:
+                    # Kiểm tra có sheet đã lưu không
+                    saved_sheet = self.user_settings.get("practice_sheet", "")
+                    if saved_sheet in sheet_names:
+                        self.practice_sheet_combo.set(saved_sheet)
+                    else:
+                        self.practice_sheet_combo.current(0)
+            except Exception as e:
+                print(f"⚠️ Lỗi load sheets: {e}")
+            
             # 💾 Lưu vào settings
             self.user_settings["practice_file"] = file_path
             self._save_settings()
@@ -5122,6 +5474,12 @@ class LanguageQuizGUI:
             messagebox.showerror("Lỗi", "❌ Vui lòng chọn file Excel!")
             return
         
+        # Kiểm tra sheet đã chọn
+        sheet_name = self.practice_sheet_combo.get() if hasattr(self, 'practice_sheet_combo') else None
+        if not sheet_name:
+            messagebox.showwarning("Cảnh báo", "⚠️ Vui lòng chọn sheet!")
+            return
+        
         # 👤 Hỏi tên người test - Custom dialog với icon
         user_name = self._ask_user_name_dialog()
         if not user_name or not user_name.strip():
@@ -5130,11 +5488,13 @@ class LanguageQuizGUI:
         self.practice_user_name = user_name.strip()
         # Lưu tên để dùng lần sau
         self.user_settings["last_user"] = self.practice_user_name
+        # Lưu sheet đã chọn
+        self.user_settings["practice_sheet"] = sheet_name
         self._save_settings()
         
-        # Read data
+        # Read data với sheet đã chọn
         try:
-            data = self._read_excel_data_practice(self.practice_selected_file)
+            data = self._read_excel_data_practice(self.practice_selected_file, sheet_name)
             if not data:
                 messagebox.showerror("Lỗi", "❌ Không đọc được dữ liệu từ file!")
                 return
@@ -5193,12 +5553,12 @@ class LanguageQuizGUI:
         # Display first question
         self._display_practice_question()
     
-    def _read_excel_data_practice(self, file_path):
+    def _read_excel_data_practice(self, file_path, sheet_name=None):
         """Đọc dữ liệu Excel cho Practice Quiz (simplified)"""
         import openpyxl
         import os
         wb = openpyxl.load_workbook(file_path)
-        ws = wb.active  # Default to first sheet
+        ws = wb[sheet_name] if sheet_name else wb.active  # Dùng sheet đã chọn hoặc sheet đầu tiên
         
         # Detect language from filename
         filename = os.path.basename(file_path).lower()
@@ -5228,6 +5588,12 @@ class LanguageQuizGUI:
     
     def _display_practice_question(self):
         """Hiển thị câu hỏi Multiple Choice"""
+        # Kiểm tra pause trước
+        if hasattr(self, 'practice_paused') and self.practice_paused:
+            # Đang pause, đợi 500ms rồi kiểm tra lại
+            self.root.after(500, self._display_practice_question)
+            return
+        
         if self.practice_current_idx >= len(self.practice_questions):
             self._show_practice_results()
             return
@@ -5235,13 +5601,16 @@ class LanguageQuizGUI:
         question = self.practice_questions[self.practice_current_idx]
         quiz_type = self.practice_quiz_type_var.get()
         
-        # Get question text
+        # Lấy số thứ tự thực tế từ Excel
+        excel_row = question.get('excel_row', self.practice_current_idx + 1)
+        
+        # Get question text với số thứ tự
         if quiz_type == "meaning":
-            question_text = f"💬 Nghĩa của từ:\n\n{question['word']}"
+            question_text = f"💬 Nghĩa của từ (#{excel_row}):\n\n{question['word']}"
             correct_answer = question['meaning']
             question_sentence = question['word']  # For TTS
         else:  # example
-            question_text = f"📝 Dịch câu sau:\n\n{question['example_en']}"
+            question_text = f"📝 Dịch câu sau (#{excel_row}):\n\n{question['example_en']}"
             correct_answer = question['example_vi']
             question_sentence = question['example_en']  # For TTS
         
@@ -6094,10 +6463,16 @@ class LanguageQuizGUI:
         
         if self.voice_quiz_paused:
             self.voice_quiz_pause_btn.config(text="▶️ TIẾP TỤC")
-            messagebox.showinfo("⏸️ Tạm dừng", "Voice Quiz đã tạm dừng.\n\n📌 Nhấn 'Tiếp tục' để làm tiếp.")
+            # Hiển thị trạng thái tạm dừng trên UI thay vì messagebox
+            if hasattr(self, 'voice_status_label'):
+                self.voice_status_label.config(text="⏸️ ĐÃ TẠM DỪNG - Nhấn 'Tiếp tục' để làm tiếp", foreground='orange')
+            print("⏸️ Voice Quiz đã tạm dừng")
         else:
             self.voice_quiz_pause_btn.config(text="⏸️ TẠM DỪNG")
-            messagebox.showinfo("▶️ Tiếp tục", "Voice Quiz đã tiếp tục!")
+            # Xóa thông báo tạm dừng
+            if hasattr(self, 'voice_status_label'):
+                self.voice_status_label.config(text="", foreground='black')
+            print("▶️ Voice Quiz đã tiếp tục")
     
     def _load_leaderboard(self):
         """Load top scores to leaderboard"""
@@ -6369,14 +6744,20 @@ class LanguageQuizGUI:
                         self.pron_sheet_combo.set(last_sheet)
                     else:
                         self.pron_sheet_combo.current(0)
-                    self._pron_update_questions()
+                    # Force update khi chọn file mới (cập nhật tổng số câu)
+                    self._pron_update_questions(force_update=True)
             except Exception as e:
                 messagebox.showerror("Lỗi", f"❌ Không thể đọc file:\n{e}")
             finally:
                 self._save_settings()
     
-    def _pron_update_questions(self):
-        """Update số câu hỏi khi chọn sheet"""
+    def _pron_update_questions(self, force_update=False):
+        """Update số câu hỏi khi chọn sheet
+        
+        Args:
+            force_update: Nếu True, sẽ cập nhật giá trị 'Đến' bằng tổng số câu.
+                         Nếu False, giữ nguyên giá trị đã lưu của user.
+        """
         if not hasattr(self, 'pron_selected_file'):
             return
         try:
@@ -6389,7 +6770,13 @@ class LanguageQuizGUI:
                 for row in ws.iter_rows(min_row=2):
                     if row[0].value:
                         count += 1
-                self.pron_end_var.set(count if count > 0 else 50)
+                
+                # Chỉ cập nhật 'Đến' nếu:
+                # 1. force_update = True (user vừa chọn file mới)
+                # 2. Hoặc chưa có giá trị đã lưu
+                if force_update or not self.user_settings.get("pron_end"):
+                    self.pron_end_var.set(count if count > 0 else 50)
+                
                 # Save sheet name to settings
                 self.user_settings["pron_sheet"] = sheet_name
                 self._save_settings()
@@ -6505,10 +6892,10 @@ class LanguageQuizGUI:
     
     def _create_pronunciation_practice_window(self):
         """Tạo cửa sổ luyện phát âm"""
-        # Create top-level window
+        # Create top-level window - MỞ RỘNG HƠN
         self.pron_practice_window = tk.Toplevel(self.root)
         self.pron_practice_window.title(f"🎤 Luyện Phát Âm - {self.pron_user_name}")
-        self.pron_practice_window.geometry("900x700")
+        self.pron_practice_window.geometry("1200x800")  # Tăng từ 900x700
         
         # Add icon to practice window
         if self.icon_path.exists():
@@ -6519,18 +6906,18 @@ class LanguageQuizGUI:
         
         # Main container
         main_frame = ttk.Frame(self.pron_practice_window)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
         
         # Header info
         header_frame = ttk.Frame(main_frame)
         header_frame.pack(fill=tk.X, pady=(0, 10))
         
         ttk.Label(header_frame, text=f"👤 {self.pron_user_name} | 📁 {Path(self.pron_selected_file).name} | 🌐 {self.pron_language}", 
-                 font=("Segoe UI", 10, "bold")).pack(anchor=tk.W)
+                 font=("Segoe UI", 11, "bold")).pack(anchor=tk.W)
         
         # Progress bar
         self.pron_progress_var = tk.IntVar(value=0)
-        progress_label = ttk.Label(header_frame, text="Tiến độ: 1/10", font=("Segoe UI", 9))
+        progress_label = ttk.Label(header_frame, text="Tiến độ: 1/10", font=("Segoe UI", 10))
         progress_label.pack(anchor=tk.W, pady=(5, 0))
         self.pron_progress_label = progress_label
         
@@ -6538,56 +6925,113 @@ class LanguageQuizGUI:
         progress_bar.pack(fill=tk.X, pady=(5, 0))
         self.pron_progress_bar = progress_bar
         
-        # Content area - Question display
-        content_frame = ttk.LabelFrame(main_frame, text="📝 Câu Hỏi", padding=10)
-        content_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        # Content area - Question display với chiều cao cố định
+        content_frame = ttk.LabelFrame(main_frame, text="📝 Câu Hỏi", padding=15)
+        content_frame.pack(fill=tk.X, pady=(0, 10))  # Đổi từ BOTH sang X, bỏ expand
+        content_frame.pack_propagate(False)  # Không cho mở rộng theo nội dung
+        content_frame.configure(height=200)  # Cố định chiều cao
         
-        # Current word/sentence display
+        # Current word/sentence display với scrollbar
+        question_container = ttk.Frame(content_frame)
+        question_container.pack(fill=tk.BOTH, expand=True)
+        
+        # Canvas và scrollbar cho câu dài
+        canvas = tk.Canvas(question_container, bg="lightblue", highlightthickness=0)
+        scrollbar = ttk.Scrollbar(question_container, orient="vertical", command=canvas.yview)
+        
         self.pron_question_display = tk.Label(
-            content_frame, 
+            canvas, 
             text="",
-            font=("Segoe UI", 20, "bold"),
+            font=("Segoe UI", 22, "bold"),  # Giảm từ 24
             bg="lightblue",
             fg="darkblue",
             pady=20,
-            wraplength=700
+            wraplength=1050
         )
-        self.pron_question_display.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
         
-        # Show meaning/example
+        # Tạo window trong canvas
+        canvas_window = canvas.create_window((0, 0), window=self.pron_question_display, anchor="nw", width=1050)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Cập nhật scroll region khi text thay đổi
+        def update_scroll_region(event=None):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        self.pron_question_display.bind("<Configure>", update_scroll_region)
+        
+        # Show meaning/example với chiều cao giới hạn
+        meaning_frame = ttk.Frame(content_frame)
+        meaning_frame.pack(fill=tk.X, pady=(5, 0))
+        
         self.pron_meaning_display = tk.Label(
-            content_frame,
+            meaning_frame,
             text="",
-            font=("Segoe UI", 12),
+            font=("Segoe UI", 12),  # Giảm từ 13
             fg="gray",
             justify=tk.LEFT,
-            wraplength=700
+            wraplength=1050,
+            height=2  # Giới hạn 2 dòng
         )
-        self.pron_meaning_display.pack(fill=tk.X, pady=5)
+        self.pron_meaning_display.pack(fill=tk.X)
         
-        # Feedback area
-        feedback_frame = ttk.LabelFrame(main_frame, text="💬 Kết Quả", padding=10)
-        feedback_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        # Feedback area với chiều cao cố định
+        feedback_frame = ttk.LabelFrame(main_frame, text="💬 Kết Quả", padding=15)
+        feedback_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 15))  # Expand để lấp đầy không gian còn lại
         
         self.pron_feedback_text = scrolledtext.ScrolledText(
             feedback_frame,
-            height=8,
-            width=80,
+            height=8,  # Giảm từ 9
+            width=100,
             wrap=tk.WORD,
-            font=("Segoe UI", 10),
+            font=("Segoe UI", 10),  # Giảm từ 11
             bg="lightyellow"
         )
         self.pron_feedback_text.pack(fill=tk.BOTH, expand=True)
         self.pron_feedback_text.config(state=tk.DISABLED)
         
-        # Control buttons
+        # Control buttons - TỔ CHỨC LẠI LAYOUT với khoảng cách lớn từ đáy
         button_frame = ttk.Frame(main_frame)
-        button_frame.pack(fill=tk.X)
+        button_frame.pack(fill=tk.X, pady=(15, 20))
         
-        ttk.Button(button_frame, text="🔊 Nghe lại", command=self._pron_repeat_sound).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="🎙️ Luyện phát âm", command=self._pron_record_pronunciation).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="✅ Tiếp theo", command=self._pron_next_question).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="❌ Dừng", command=self._pron_stop_practice).pack(side=tk.LEFT, padx=5)
+        # Left side buttons (smaller) - với padding cao hơn
+        left_buttons = ttk.Frame(button_frame)
+        left_buttons.pack(side=tk.LEFT, fill=tk.X)
+        
+        # Tăng chiều cao hiển thị text của nút
+        ttk.Button(left_buttons, text="🔊 Nghe lại", command=self._pron_repeat_sound, width=15).pack(side=tk.LEFT, padx=5, pady=8, ipady=8)
+        ttk.Button(left_buttons, text="⬅️ Quay lại", command=self._pron_previous_question, width=15).pack(side=tk.LEFT, padx=5, pady=8, ipady=8)
+        ttk.Button(left_buttons, text="✅ Tiếp theo", command=self._pron_next_question, width=15).pack(side=tk.LEFT, padx=5, pady=8, ipady=8)
+        ttk.Button(left_buttons, text="❌ Dừng", command=self._pron_stop_practice, width=15).pack(side=tk.LEFT, padx=5, pady=8, ipady=8)
+        
+        # Middle - Countdown timer (ẩn ban đầu)
+        self.pron_countdown_label = tk.Label(
+            button_frame,
+            text="",
+            font=("Segoe UI", 16, "bold"),
+            fg="#FF5722",
+            bg="#f5f5f5"
+        )
+        self.pron_countdown_label.pack(side=tk.LEFT, padx=30, expand=True)
+        
+        # Right side - BIG RECORD BUTTON
+        self.pron_record_btn = tk.Button(
+            button_frame,
+            text="🎙️ LUYỆN PHÁT ÂM",
+            command=self._pron_record_pronunciation,
+            font=("Segoe UI", 14, "bold"),
+            bg="#4CAF50",
+            fg="white",
+            activebackground="#45a049",
+            activeforeground="white",
+            relief=tk.RAISED,
+            bd=3,
+            padx=35,
+            pady=22,
+            cursor="hand2"
+        )
+        self.pron_record_btn.pack(side=tk.RIGHT, padx=10, pady=8)
         
         # Display first question
         self._pron_display_current_question()
@@ -6602,31 +7046,38 @@ class LanguageQuizGUI:
         question_num = self.pron_current_idx + 1
         total = len(self.pron_questions)
         
+        # Lấy số thứ tự thực tế từ Excel (nếu có)
+        actual_excel_num = current.get('excel_row', question_num)
+        
         # Update progress
         progress = int((question_num / total) * 100)
         self.pron_progress_var.set(progress)
         self.pron_progress_label.config(text=f"Tiến độ: {question_num}/{total}")
         
-        # Update question display
-        question_text = f"{question_num}. {current['word']}"
+        # Update question display based on quiz type
+        if self.pron_quiz_type_var.get() == "meaning":
+            # Show word for vocabulary practice
+            question_text = f"{actual_excel_num}. {current['word']}"
+            meaning_text = f"📚 Nghĩa: {current['meaning']}"
+        else:
+            # Show example sentence for sentence practice
+            question_text = f"{actual_excel_num}. {current['example_en']}"
+            meaning_text = f"📝 Từ gốc: {current['word']}\n🇻🇳 Nghĩa: {current['example_vn']}"
+        
         self.pron_question_display.config(text=question_text)
         
         # Update meaning/example
-        if self.pron_quiz_type_var.get() == "meaning":
-            meaning_text = f"📚 Nghĩa: {current['meaning']}"
-        else:
-            meaning_text = f"📝 Ví dụ: {current['example_en']}\n🇻🇳 {current['example_vn']}"
         
         self.pron_meaning_display.config(text=meaning_text)
         
         # Clear feedback
         self.pron_feedback_text.config(state=tk.NORMAL)
         self.pron_feedback_text.delete(1.0, tk.END)
-        self.pron_feedback_text.insert(tk.END, f"✅ Sẵn sàng luyện câu {question_num}!\n\n1️⃣ Ấn '🔊 Nghe lại' để nghe từ/câu\n2️⃣ Ấn '🎙️ Luyện phát âm' để luyện\n3️⃣ Hệ thống sẽ so sánh phát âm\n4️⃣ Ấn '✅ Tiếp theo' để câu tiếp theo")
+        self.pron_feedback_text.insert(tk.END, f"✅ Sẵn sàng luyện câu {question_num}!\n\n1️⃣ 🔊 Nghe từ/câu được phát tự động\n2️⃣ Ấn '🎙️ Luyện phát âm' để ghi âm\n3️⃣ Hệ thống sẽ so sánh phát âm\n4️⃣ Ấn '✅ Tiếp theo' để câu tiếp theo")
         self.pron_feedback_text.config(state=tk.DISABLED)
         
-        # Play the word immediately
-        self._pron_play_question_sound()
+        # 🎵 Auto-play the word/sentence immediately when entering practice window
+        self.pron_practice_window.after(500, self._pron_play_question_sound)
     
     def _pron_play_question_sound(self):
         """Phát âm thanh câu hỏi"""
@@ -6661,6 +7112,63 @@ class LanguageQuizGUI:
             daemon=True
         ).start()
     
+    def _calculate_recording_time(self, text: str):
+        """
+        Tính toán thời gian ghi âm động dựa trên độ dài text
+        Trả về: (timeout_seconds, phrase_time_limit_seconds) - tuple
+        
+        Logic tối ưu cho các ngôn ngữ khác nhau:
+        - Phát hiện tiếng Nhật/Trung: Tính theo số ký tự (không có khoảng trắng)
+        - Tiếng Anh: Tính theo số từ
+        """
+        text_length = len(text.strip())
+        
+        # Phát hiện CJK characters (Chinese, Japanese, Korean)
+        def has_cjk(s):
+            return any('\u4e00' <= c <= '\u9fff' or  # Chinese
+                      '\u3040' <= c <= '\u309f' or  # Hiragana
+                      '\u30a0' <= c <= '\u30ff' or  # Katakana
+                      '\uac00' <= c <= '\ud7af'     # Korean
+                      for c in s)
+        
+        is_cjk = has_cjk(text)
+        
+        if is_cjk:
+            # Tiếng Nhật/Trung: Tính theo số ký tự
+            # Mỗi ký tự CJK ~ 0.4-0.5 giây để phát âm
+            if text_length < 10:
+                phrase_time_limit = 6.0
+                timeout = 8
+            elif text_length < 20:
+                phrase_time_limit = min(12, max(6, text_length * 0.5 + 2))
+                timeout = int(phrase_time_limit) + 4
+            elif text_length < 40:
+                phrase_time_limit = min(20, max(12, text_length * 0.4 + 4))
+                timeout = int(phrase_time_limit) + 5
+            else:
+                phrase_time_limit = min(30, max(20, text_length * 0.35 + 6))
+                timeout = int(phrase_time_limit) + 6
+            print(f"⏱️ CJK Text: {text_length} chars → Timeout: {timeout}s, Phrase limit: {phrase_time_limit:.1f}s")
+        else:
+            # Tiếng Anh: Tính theo số từ
+            word_count = len(text.strip().split())
+            
+            if text_length < 15:
+                phrase_time_limit = 4.0
+                timeout = 5
+            elif text_length < 50:
+                phrase_time_limit = min(8, max(4, word_count * 0.7 + 2))
+                timeout = int(phrase_time_limit) + 3
+            elif text_length < 100:
+                phrase_time_limit = min(15, max(8, word_count * 0.6 + 3))
+                timeout = int(phrase_time_limit) + 4
+            else:
+                phrase_time_limit = min(25, max(15, word_count * 0.5 + 4))
+                timeout = int(phrase_time_limit) + 5
+            print(f"⏱️ Text: {text_length} chars, {word_count} words → Timeout: {timeout}s, Phrase limit: {phrase_time_limit:.1f}s")
+        
+        return int(timeout), float(phrase_time_limit)
+    
     def _pron_repeat_sound(self):
         """Nghe lại câu hỏi"""
         self._pron_play_question_sound()
@@ -6676,7 +7184,7 @@ class LanguageQuizGUI:
         # Update feedback
         self.pron_feedback_text.config(state=tk.NORMAL)
         self.pron_feedback_text.delete(1.0, tk.END)
-        self.pron_feedback_text.insert(tk.END, "🎙️ Dang ghi am... hay phat am!")
+        self.pron_feedback_text.insert(tk.END, "🎙️ Đang ghi âm... hãy phát âm rõ ràng!")
         self.pron_feedback_text.config(state=tk.DISABLED)
         self.pron_practice_window.update()
         
@@ -6685,32 +7193,80 @@ class LanguageQuizGUI:
             try:
                 # Use correct method: listen_to_microphone
                 language = "en-US" if self.pron_language == "English" else "ja-JP" if self.pron_language == "Japanese" else "zh-CN"
-                user_text = self.voice_manager.voice_manager.listen_to_microphone(timeout=5, language=language, quiz_type="pronunciation")
+                
+                # 📊 Calculate dynamic recording time based on text length
+                speak_text = word if self.pron_quiz_type_var.get() == "meaning" else current.get('example_en', word)
+                timeout, phrase_time_limit = self._calculate_recording_time(speak_text)
+                
+                # Callback để cập nhật countdown
+                def update_countdown(remaining_time):
+                    if hasattr(self, 'pron_countdown_label'):
+                        self.pron_countdown_label.config(text=f"⏱️ {remaining_time:.0f}s")
+                        self.pron_practice_window.update()
+                
+                # Hiển thị countdown ban đầu
+                self.pron_countdown_label.config(text=f"⏱️ {phrase_time_limit:.0f}s")
+                
+                user_text = self.voice_manager.voice_manager.listen_to_microphone(
+                    timeout=timeout, 
+                    language=language, 
+                    quiz_type=self.pron_quiz_type_var.get(),
+                    phrase_time_limit=phrase_time_limit,
+                    countdown_callback=update_countdown
+                )
+                
+                # Ẩn countdown khi xong
+                self.pron_countdown_label.config(text="")
                 
                 if not user_text:
                     self.pron_feedback_text.config(state=tk.NORMAL)
                     self.pron_feedback_text.delete(1.0, tk.END)
-                    self.pron_feedback_text.insert(tk.END, "Loi: Khong the ghi am. Hay kiem tra mic va thu lai!")
+                    self.pron_feedback_text.insert(tk.END, "❌ Lỗi: Không thể ghi âm. Hãy kiểm tra microphone và thử lại!")
                     self.pron_feedback_text.config(state=tk.DISABLED)
                     return
                 
-                # Simple comparison: check if recognized text contains the word
-                user_text_lower = str(user_text).lower().strip()
-                word_lower = str(word).lower().strip()
+                # 🎯 Use Scorer for intelligent comparison (supports semantic matching)
+                try:
+                    from scorer import Scorer
+                    scorer = Scorer()
+                    
+                    # Get correct answer based on quiz type
+                    if self.pron_quiz_type_var.get() == "meaning":
+                        correct_answer = word
+                    else:
+                        correct_answer = current.get('example_en', word)
+                    
+                    # Use Scorer for comparison (returns score 0-10)
+                    score, feedback_msg, is_semantic = scorer.calculate_score(user_answer=user_text, correct_answer=correct_answer, attempt=1)
+                    similarity = (score / 10.0) * 100  # Convert to percentage
+                    is_correct = score >= 5  # Score >= 5 means correct
+                    
+                    # Additional check: if recognized text contains the target (word or sentence)
+                    user_text_lower = str(user_text).lower().strip()
+                    correct_lower = str(correct_answer).lower().strip()
+                    if correct_lower in user_text_lower or user_text_lower in correct_lower:
+                        is_correct = True
+                        similarity = max(similarity, 85)  # Boost similarity if target is found
+                    
+                    print(f"✅ Scorer result: score={score}, similarity={similarity:.1f}%, is_correct={is_correct}")
                 
-                # Calculate similarity as percentage
-                from difflib import SequenceMatcher
-                similarity = SequenceMatcher(None, user_text_lower, word_lower).ratio() * 100
-                
-                # Determine result (threshold: 60% similarity)
-                is_correct = similarity >= 60
+                except (ImportError, Exception) as e:
+                    # Fallback: Simple comparison if Scorer not available
+                    print(f"⚠️ Fallback comparison (Scorer error: {e})")
+                    user_text_lower = str(user_text).lower().strip()
+                    correct_lower = str(correct_answer).lower().strip()
+                    
+                    from difflib import SequenceMatcher
+                    similarity = SequenceMatcher(None, user_text_lower, correct_lower).ratio() * 100
+                    is_correct = similarity >= 70  # Increased threshold from 60 to 70
                 
                 # Update feedback
                 self._pron_display_feedback(similarity, is_correct, user_text)
                 
-                # Save result
+                # Save result (use correct_answer instead of just word)
+                question_display = correct_answer if self.pron_quiz_type_var.get() == "example" else word
                 result = {
-                    "question": f"{self.pron_current_idx + 1}. {word}",
+                    "question": f"{self.pron_current_idx + 1}. {question_display}",
                     "similarity": similarity,
                     "is_correct": is_correct
                 }
@@ -6731,34 +7287,51 @@ class LanguageQuizGUI:
         threading.Thread(target=record_and_compare, daemon=True).start()
     
     def _pron_display_feedback(self, similarity, is_correct, user_text=""):
-        """Hien thi phan hoi"""
+        """Hiển thị phản hồi cải tiến"""
         current = self.pron_questions[self.pron_current_idx]
+        
+        # Get the target text based on quiz type
+        if self.pron_quiz_type_var.get() == "meaning":
+            target_text = current['word']
+        else:
+            target_text = current.get('example_en', current['word'])
         
         # Determine star rating
         if similarity >= 90:
-            stars = "[3 stars] Xuat sac!"
+            stars = "⭐⭐⭐ Xuất sắc!"
         elif similarity >= 75:
-            stars = "[2 stars] Tot!"
+            stars = "⭐⭐ Tốt!"
         elif similarity >= 60:
-            stars = "[1 star] Co cai thien"
+            stars = "⭐ Có cải thiện"
         else:
-            stars = "[0 stars] Tiep tuc luyen"
+            stars = "Tiếp tục luyện"
         
-        feedback = f"""{'[OK] DUNG!' if is_correct else '[FAIL] SAI!'}
+        feedback = f"""{'✅ ĐÚNG!' if is_correct else '❌ SAI!'}
 
-Diem tuong dong: {similarity:.1f}%
-Muc do: {stars}
+Độ tương đồng: {similarity:.1f}%
+Mức độ: {stars}
 
-{'Hoan hao! Tiep tuc nhe!' if is_correct else f'Goi y: Ban phat am "{current["word"]}" can nhu am thanh da phat'}
+{'🎉 Hoàn hảo! Tiếp tục nhé!' if is_correct else f'💡 Gợi ý: Hãy phát âm "{target_text}" giống như âm thanh được phát'}
 
-Recognized: {user_text}
+🎙️ Nhận dạng: {user_text}
 
-An 'Tiep theo' de sang cau tiep theo hoac 'Luyen phat am' de luyen lai."""
+📌 Ấn 'Tiếp theo' để sang câu tiếp theo hoặc 'Luyện phát âm' để luyện lại."""
         
         self.pron_feedback_text.config(state=tk.NORMAL)
         self.pron_feedback_text.delete(1.0, tk.END)
         self.pron_feedback_text.insert(tk.END, feedback)
         self.pron_feedback_text.config(state=tk.DISABLED)
+    
+    def _pron_previous_question(self):
+        """Quay lại câu trước đó"""
+        if self.pron_current_idx > 0:
+            self.pron_current_idx -= 1
+            self._pron_display_current_question()
+            # Phát âm tự động khi quay lại
+            if hasattr(self, 'voice_manager') and self.voice_manager:
+                self.pron_practice_window.after(500, self._pron_repeat_sound)
+        else:
+            messagebox.showinfo("Thông báo", "Đây là câu đầu tiên!")
     
     def _pron_next_question(self):
         """Sang câu tiếp theo"""
@@ -6795,18 +7368,41 @@ An 'Tiep theo' de sang cau tiep theo hoac 'Luyen phat am' de luyen lai."""
         
         messagebox.showinfo("✅ Hoàn thành", result_msg)
         
-        # Save to database
+        # Save to database using smart_review_db
         try:
-            from datetime import datetime
-            self.study_db.add_result(
-                user_name=self.pron_user_name,
-                sheet_name=Path(self.pron_selected_file).name,
-                quiz_type="pronunciation",
-                score=accuracy,
-                correct_count=correct,
-                wrong_count=wrong,
-                wrong_questions=",".join([r["question"] for r in self.pron_results if not r["is_correct"]])
-            )
+            if self.smart_review_db:
+                # Save each pronunciation result individually
+                for result in self.pron_results:
+                    question_idx = int(result["question"].split(".")[0])
+                    question_text = result.get("target", "")  # Lấy text cần phát âm
+                    user_answer = result.get("recognized", "")  # Lấy kết quả nhận dạng
+                    
+                    self.smart_review_db.save_question_result(
+                        file_path=str(self.pron_selected_file),
+                        question_id=question_idx,
+                        question_text=question_text,
+                        correct_answer=question_text,  # Đáp án đúng chính là text gốc
+                        user_name=self.pron_user_name,
+                        quiz_type="pronunciation",
+                        test_mode=1,  # Pronunciation mode
+                        is_correct=result["is_correct"],
+                        user_answer=user_answer,
+                        score=int(result["similarity"] / 10)  # Convert to 0-10 scale
+                    )
+                
+                # Save session summary
+                self.smart_review_db.save_session(
+                    user_name=self.pron_user_name,
+                    file_path=str(self.pron_selected_file),
+                    quiz_type="pronunciation",
+                    test_mode=1,  # Pronunciation mode
+                    total=total,
+                    correct=correct,
+                    wrong=wrong,
+                    avg_score=accuracy / 10,  # Convert to 0-10 scale
+                    duration=0  # TODO: Track duration if needed
+                )
+                print(f"✅ Đã lưu kết quả luyện phát âm: {correct}/{total} ({accuracy:.1f}%)")
         except Exception as e:
             print(f"⚠️ Lỗi lưu kết quả: {e}")
 
