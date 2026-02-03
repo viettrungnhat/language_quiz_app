@@ -3377,8 +3377,13 @@ class LanguageQuizGUI:
                     instruction = instructions.get(bot_lang, instructions["vi"]).get(self.quiz_type_str, instructions["vi"]["meaning"])
                     
                     print(f"📢 [Instruction - {bot_lang}] {instruction}")
+                    print(f"🔊 DEBUG: Phát âm hướng dẫn Mode 1 bắt đầu...")  # DEBUG
                     self._start_gif_animation()
-                    self.voice_manager.voice_manager.speak_google_tts(instruction, language=bot_lang)
+                    try:
+                        result = self.voice_manager.voice_manager.speak_google_tts(instruction, language=bot_lang)
+                        print(f"🔊 DEBUG: Instruction TTS returned {result}")  # DEBUG
+                    except Exception as e:
+                        print(f"⚠️ ERROR: Instruction TTS lỗi: {e}")
                     self._stop_gif_animation()
                     time.sleep(0.5)
                     self.instruction_shown = True
@@ -3386,8 +3391,15 @@ class LanguageQuizGUI:
                 # Đọc nội dung câu (không hướng dẫn)
                 # Mode 1: Câu hỏi luôn là tiếng Việt, nên dùng voice 'vi'
                 print(f"📢 [Mode 1] Đọc câu hỏi VN: {meaning_part[:60]}...")
+                print(f"🔊 DEBUG: Phát âm bắt đầu (Mode 1)...")  # DEBUG
                 self._start_gif_animation()  # 🎨 Bắt đầu animate
-                self.voice_manager.voice_manager.speak_google_tts(meaning_part, language='vi')
+                try:
+                    result = self.voice_manager.voice_manager.speak_google_tts(meaning_part, language='vi')
+                    print(f"🔊 DEBUG: speak_google_tts returned {result}")  # DEBUG
+                    if not result:
+                        print(f"⚠️ WARNING: TTS phát âm thất bại!")
+                except Exception as e:
+                    print(f"⚠️ ERROR: TTS lỗi: {e}")
                 self._stop_gif_animation()  # 🎨 Dừng animate
                 time.sleep(0.3)
             
@@ -3424,8 +3436,13 @@ class LanguageQuizGUI:
                     instruction = instructions.get(bot_lang, instructions["vi"]).get(self.quiz_type_str, instructions["vi"]["meaning"])
                     
                     print(f"📢 [Instruction - {bot_lang}] {instruction}")
+                    print(f"🔊 DEBUG: Phát âm hướng dẫn Mode 2 bắt đầu...")  # DEBUG
                     self._start_gif_animation()
-                    self.voice_manager.voice_manager.speak_google_tts(instruction, language=bot_lang)
+                    try:
+                        result = self.voice_manager.voice_manager.speak_google_tts(instruction, language=bot_lang)
+                        print(f"🔊 DEBUG: Instruction TTS returned {result}")  # DEBUG
+                    except Exception as e:
+                        print(f"⚠️ ERROR: Instruction TTS lỗi: {e}")
                     self._stop_gif_animation()
                     time.sleep(0.5)
                     self.instruction_shown = True
@@ -3452,10 +3469,24 @@ class LanguageQuizGUI:
                         voice_choice = "Takumi" if self.ja_voice_var.get() == "male" else "Mizuki"
                     
                     print(f"📢 [Mode 2] Đọc {quiz_lang} (Polly - {voice_choice}): {foreign_part[:60]}...")
-                    self.voice_manager.voice_manager.speak_with_polly(foreign_part, language=tts_lang, voice=voice_choice)
+                    print(f"🔊 DEBUG: Phát âm Polly bắt đầu...")  # DEBUG
+                    try:
+                        result = self.voice_manager.voice_manager.speak_with_polly(foreign_part, language=tts_lang, voice=voice_choice)
+                        print(f"🔊 DEBUG: speak_with_polly returned {result}")  # DEBUG
+                        if not result:
+                            print(f"⚠️ WARNING: Polly phát âm thất bại, thử gTTS...")
+                    except Exception as e:
+                        print(f"⚠️ ERROR: Polly lỗi: {e}")
                 else:
                     print(f"📢 [Mode 2] Đọc {quiz_lang} (gTTS): {foreign_part[:60]}...")
-                    self.voice_manager.voice_manager.speak_google_tts(foreign_part, language=tts_lang)
+                    print(f"🔊 DEBUG: Phát âm gTTS bắt đầu...")  # DEBUG
+                    try:
+                        result = self.voice_manager.voice_manager.speak_google_tts(foreign_part, language=tts_lang)
+                        print(f"🔊 DEBUG: speak_google_tts returned {result}")  # DEBUG
+                        if not result:
+                            print(f"⚠️ WARNING: gTTS phát âm thất bại!")
+                    except Exception as e:
+                        print(f"⚠️ ERROR: gTTS lỗi: {e}")
                 time.sleep(0.5)
             
             # ✨ Phát âm thanh "tút" - báo hiệu bắt đầu ngay
