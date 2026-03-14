@@ -3559,37 +3559,47 @@ class LanguageQuizGUI:
             
             # ✨ Đếm ngược TRONG LÚC NGHE (thread riêng)
             def countdown_during_listening():
-                for i in range(listen_timeout, 0, -1):
-                    if not self.quiz_active or not self.app_running:
-                        return
-                    try:
-                        self.root.after(0, lambda sec=i: self.countdown_label.config(text=str(sec)))
-                    except (RuntimeError, tk.TclError):
-                        break  # Main loop đã dừng
-                    time.sleep(1)
-                # Xóa countdown khi hết giờ
                 try:
-                    self.root.after(0, lambda: self.countdown_label.config(text=""))
-                except (RuntimeError, tk.TclError):
-                    pass
+                    for i in range(listen_timeout, 0, -1):
+                        if not self.quiz_active or not self.app_running:
+                            return
+                        try:
+                            self.root.after(0, lambda sec=i: self.countdown_label.config(text=str(sec)))
+                        except (RuntimeError, tk.TclError):
+                            break  # Main loop đã dừng
+                        time.sleep(1)
+                    # Xóa countdown khi hết giờ
+                    try:
+                        self.root.after(0, lambda: self.countdown_label.config(text=""))
+                    except (RuntimeError, tk.TclError):
+                        pass
+                except Exception as e:
+                    print(f"⚠️ Countdown thread error: {e}")
+                    import traceback
+                    traceback.print_exc()
             
             Thread(target=countdown_during_listening, daemon=True).start()
             
             # Animate bar trong background thread
             def animate_mic_bar():
-                for _ in range(listen_timeout * 2):  # Chạy theo timeout
-                    if not self.app_running:
-                        break
-                    # Check if paused
-                    if hasattr(self, 'voice_quiz_paused') and self.voice_quiz_paused:
+                try:
+                    for _ in range(listen_timeout * 2):  # Chạy theo timeout
+                        if not self.app_running:
+                            break
+                        # Check if paused
+                        if hasattr(self, 'voice_quiz_paused') and self.voice_quiz_paused:
+                            time.sleep(0.5)
+                            continue
+                        level = random.randint(20, 80)
+                        try:
+                            self.root.after(0, lambda l=level: self.mic_level_bar.config(value=l))
+                        except RuntimeError:
+                            break
                         time.sleep(0.5)
-                        continue
-                    level = random.randint(20, 80)
-                    try:
-                        self.root.after(0, lambda l=level: self.mic_level_bar.config(value=l))
-                    except RuntimeError:
-                        break
-                    time.sleep(0.5)
+                except Exception as e:
+                    print(f"⚠️ Mic bar animation thread error: {e}")
+                    import traceback
+                    traceback.print_exc()
             
             Thread(target=animate_mic_bar, daemon=True).start()
             
@@ -3748,14 +3758,19 @@ class LanguageQuizGUI:
                     
                     # Đóng popup NGAY lập tức + đến câu tiếp
                     def fast_next():
-                        time.sleep(0.2)  # Hiển thị popup 0.2s
-                        if popup_ref[0] and self.app_running:
-                            try:
-                                self.root.after(0, popup_ref[0].destroy)
-                            except:
-                                pass
-                        time.sleep(0.1)
-                        self._safe_next_question()
+                        try:
+                            time.sleep(0.2)  # Hiển thị popup 0.2s
+                            if popup_ref[0] and self.app_running:
+                                try:
+                                    self.root.after(0, popup_ref[0].destroy)
+                                except:
+                                    pass
+                            time.sleep(0.1)
+                            self._safe_next_question()
+                        except Exception as e:
+                            print(f"⚠️ Fast next thread error: {e}")
+                            import traceback
+                            traceback.print_exc()
                     Thread(target=fast_next, daemon=True).start()
                     return
                 
@@ -3772,26 +3787,31 @@ class LanguageQuizGUI:
                 
                 # Phát TTS trong thread riêng, tự đóng popup khi xong
                 def play_tts_async():
-                    bot_lang = self._get_bot_language_code()
-                    # ⚡ Feedback đa ngôn ngữ
-                    feedback_texts = {
-                        "vi": "Đúng!",
-                        "en": "Correct!",
-                        "zh": "对了！",
-                        "ja": "正解！"
-                    }
-                    feedback_tts = feedback_texts.get(bot_lang, "Đúng!")
-                    self.voice_manager.voice_manager.speak_google_tts(feedback_tts, language=bot_lang)
-                    # Đóng popup sau khi TTS xong
-                    time.sleep(0.3)
-                    if popup_ref[0] and self.app_running:
-                        try:
-                            self.root.after(0, popup_ref[0].destroy)
-                        except:
-                            pass
-                    # Next question sau 0.5s
-                    time.sleep(0.5)
-                    self._safe_next_question()
+                    try:
+                        bot_lang = self._get_bot_language_code()
+                        # ⚡ Feedback đa ngôn ngữ
+                        feedback_texts = {
+                            "vi": "Đúng!",
+                            "en": "Correct!",
+                            "zh": "对了！",
+                            "ja": "正解！"
+                        }
+                        feedback_tts = feedback_texts.get(bot_lang, "Đúng!")
+                        self.voice_manager.voice_manager.speak_google_tts(feedback_tts, language=bot_lang)
+                        # Đóng popup sau khi TTS xong
+                        time.sleep(0.3)
+                        if popup_ref[0] and self.app_running:
+                            try:
+                                self.root.after(0, popup_ref[0].destroy)
+                            except:
+                                pass
+                        # Next question sau 0.5s
+                        time.sleep(0.5)
+                        self._safe_next_question()
+                    except Exception as e:
+                        print(f"⚠️ TTS async thread error (correct answer): {e}")
+                        import traceback
+                        traceback.print_exc()
                 Thread(target=play_tts_async, daemon=True).start()
                 return  # Dừng luồng chính tại đây, để thread tự next
             else:
@@ -3848,53 +3868,60 @@ class LanguageQuizGUI:
                 # Phát TTS trong thread riêng, tự đóng popup khi xong
                 use_polly = (answer_lang != "vi")
                 def play_tts_async():
-                    # Check pause state before TTS
-                    while hasattr(self, 'voice_quiz_paused') and self.voice_quiz_paused:
-                        if not self.quiz_active:
-                            return
-                        time.sleep(0.5)
-                    
-                    if use_faster_feedback:
-                        # Chế độ nhanh: chỉ hiển thị 0.5s rồi đến câu tiếp
-                        time.sleep(0.5)
-                    else:
-                        # Chế độ bình thường: phát TTS
-                        self.voice_manager.voice_manager.speak_google_tts(feedback_text, language=bot_lang)
-                        
-                        # Check pause before speaking answer
+                    try:
+                        # Check pause state before TTS
                         while hasattr(self, 'voice_quiz_paused') and self.voice_quiz_paused:
                             if not self.quiz_active:
                                 return
                             time.sleep(0.5)
                         
-                        # Dùng Polly cho Anh/Trung/Nhật, gTTS cho Việt
-                        if answer_lang in ["en", "zh", "ja"]:
-                            # Lấy voice choice từ UI
-                            voice_choice = None
-                            if answer_lang == "en":
-                                voice_choice = "Matthew" if self.en_voice_var.get() == "male" else "Joanna"
-                            elif answer_lang == "ja":
-                                voice_choice = "Takumi" if self.ja_voice_var.get() == "male" else "Mizuki"
-                            
-                            self.voice_manager.voice_manager.speak_with_polly(correct_answer, language=answer_lang, voice=voice_choice)
+                        if use_faster_feedback:
+                            # Chế độ nhanh: chỉ hiển thị 0.5s rồi đến câu tiếp
+                            time.sleep(0.5)
                         else:
-                            self.voice_manager.voice_manager.speak_google_tts(correct_answer, language=answer_lang)
-                        time.sleep(0.5)
-                    
-                    # Đóng popup
-                    if popup_ref[0] and self.app_running:
-                        try:
-                            self.root.after(0, popup_ref[0].destroy)
-                        except:
-                            pass
-                    # Next question
-                    time.sleep(0.3)
-                    self._safe_next_question()
+                            # Chế độ bình thường: phát TTS
+                            self.voice_manager.voice_manager.speak_google_tts(feedback_text, language=bot_lang)
+                            
+                            # Check pause before speaking answer
+                            while hasattr(self, 'voice_quiz_paused') and self.voice_quiz_paused:
+                                if not self.quiz_active:
+                                    return
+                                time.sleep(0.5)
+                            
+                            # Dùng Polly cho Anh/Trung/Nhật, gTTS cho Việt
+                            if answer_lang in ["en", "zh", "ja"]:
+                                # Lấy voice choice từ UI
+                                voice_choice = None
+                                if answer_lang == "en":
+                                    voice_choice = "Matthew" if self.en_voice_var.get() == "male" else "Joanna"
+                                elif answer_lang == "ja":
+                                    voice_choice = "Takumi" if self.ja_voice_var.get() == "male" else "Mizuki"
+                                
+                                self.voice_manager.voice_manager.speak_with_polly(correct_answer, language=answer_lang, voice=voice_choice)
+                            else:
+                                self.voice_manager.voice_manager.speak_google_tts(correct_answer, language=answer_lang)
+                            time.sleep(0.5)
+                        
+                        # Đóng popup
+                        if popup_ref[0] and self.app_running:
+                            try:
+                                self.root.after(0, popup_ref[0].destroy)
+                            except:
+                                pass
+                        # Next question
+                        time.sleep(0.3)
+                        self._safe_next_question()
+                    except Exception as e:
+                        print(f"⚠️ TTS async thread error (wrong answer): {e}")
+                        import traceback
+                        traceback.print_exc()
                 Thread(target=play_tts_async, daemon=True).start()
                 return  # Dừng luồng chính tại đây, để thread tự next
         
         except Exception as e:
-            print(f"❌ Lỗi: {e}")
+            print(f"❌ Lỗi _process_voice_question: {e}")
+            import traceback
+            traceback.print_exc()  # ⚡ Print full traceback to diagnose crash
             self._safe_show_error(f"Lỗi: {e}")
         finally:
             # 🔒 Release lock khi xong
@@ -4971,8 +4998,13 @@ class LanguageQuizGUI:
             
             if wrong_results:
                 # Lấy danh sách số câu sai, sắp xếp theo thứ tự
-                wrong_nums = sorted([r.get('question_num', '?') for r in wrong_results])
-                message_content += f"\n❌ Câu: {', '.join(map(str, wrong_nums))}"
+                # ⚡ Fix: Chỉ lấy numbers, bỏ qua '?'
+                wrong_nums = [r.get('question_num', 0) for r in wrong_results if isinstance(r.get('question_num'), (int, float))]
+                if wrong_nums:
+                    wrong_nums = sorted(wrong_nums)
+                    message_content += f"\n❌ Câu: {', '.join(map(str, wrong_nums))}"
+                else:
+                    message_content += f"\n❌ {len(wrong_results)} câu sai"
             else:
                 message_content += "\n🎉 **Tất cả đều đúng! Xuất sắc!**"
             
@@ -6075,7 +6107,10 @@ class LanguageQuizGUI:
             
             # Danh sách câu sai
             wrong_results = [r for r in self.practice_results if not r.get('is_correct', True)]
-            wrong_nums = sorted([r.get('question_num', '?') for r in wrong_results])
+            # ⚡ Fix: Chỉ lấy numbers, bỏ qua '?'
+            wrong_nums = [r.get('question_num', 0) for r in wrong_results if isinstance(r.get('question_num'), (int, float))]
+            if wrong_nums:
+                wrong_nums = sorted(wrong_nums)
             
             message_content = f"""
 📝 **KẾT QUẢ KIỂM TRA TRẮC NGHIỆM**
